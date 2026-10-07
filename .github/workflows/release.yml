@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to build
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:RELEASE_TAG -cne "v$version") { throw 'Tag does not match package version.' }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run package:win
+      - run: npm run package:win:zip
+      - name: Prepare release files
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Path release/publish -Force | Out-Null
+          Copy-Item -LiteralPath "release/Art Creator-$version-win-x64.exe" -Destination "release/publish/ArtCreator-$version-win-x64-setup.exe"
+          Copy-Item -LiteralPath "release/zip/Art Creator-$version-win-x64.zip" -Destination "release/publish/ArtCreator-$version-win-x64-portable.zip"
+          $files = Get-ChildItem release/publish -File | Sort-Object Name
+          $checksums = $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
+          $checksums | Set-Content release/publish/SHA256SUMS.txt -Encoding utf8NoBOM
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: release/publish/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $existing = gh release view $env:RELEASE_TAG --json isDraft 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if (-not ($existing | ConvertFrom-Json).isDraft) { throw 'Release is already published; assets will not be replaced.' }
+          } else {
+            $notes = @'
+          ArtCreator 首个开源版本。
+
+          支持屏幕框选生图、提示词润色、多参考图与局部重绘、批量生成、置顶悬浮预览、历史切换和 PNG 导出。
+          接入 OpenAI、LiblibAI 及本地 ComfyUI；透明背景与抠图为实验性能力，具体可用操作取决于模型。
+
+          下载：setup.exe 为 Windows x64 安装版，portable.zip 为完整解压后运行的绿色版，SHA256SUMS.txt 为校验文件。
+          安装包未进行代码签名。模型服务需自行配置，云端服务可能产生费用。
+          '@
+            $notes | Set-Content release/notes.md -Encoding utf8NoBOM
+            gh release create $env:RELEASE_TAG --verify-tag --draft --title "ArtCreator $env:RELEASE_TAG" --notes-file release/notes.md
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to create draft release.' }
+          }
+          $assets = @(Get-ChildItem release/publish -File | ForEach-Object { $_.FullName })
+          gh release upload $env:RELEASE_TAG @assets --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to upload release files.' }

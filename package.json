@@ -1,0 +1,119 @@
+{
+  "name": "art-creator",
+  "version": "0.1.4",
+  "private": true,
+  "description": "Capture a screen region and generate a pinned visual asset with AI.",
+  "license": "MIT",
+  "author": "7-erQ",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/7-erQ/ArtCreator.git"
+  },
+  "homepage": "https://github.com/7-erQ/ArtCreator",
+  "bugs": {
+    "url": "https://github.com/7-erQ/ArtCreator/issues"
+  },
+  "main": "./out/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "package": "npm run build && electron-builder --publish never",
+    "package:win": "npm run build && electron-builder --win --publish never",
+    "package:win:zip": "npm run build && electron-builder --win zip --x64 --publish never -c.extraMetadata.portable=true -c.directories.output=release/zip",
+    "package:mac": "npm run build && electron-builder --mac --publish never",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "postinstall": "node node_modules/electron/install.js"
+  },
+  "build": {
+    "appId": "com.artcreator.desktop",
+    "productName": "Art Creator",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "asar": true,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "package.json",
+      "LICENSE"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "assets/app-icon.png"
+      },
+      {
+        "from": "resources/tray.png",
+        "to": "assets/tray.png"
+      },
+      {
+        "from": "resources/tray@2x.png",
+        "to": "assets/tray@2x.png"
+      },
+      {
+        "from": "resources/trayTemplate.png",
+        "to": "assets/trayTemplate.png"
+      },
+      {
+        "from": "resources/trayTemplate@2x.png",
+        "to": "assets/trayTemplate@2x.png"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always"
+    },
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "icon": "build/icon.icns",
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "@electron-toolkit/utils": "4.0.0",
+    "openai": "7.5.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.3.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "44.0.0",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "eslint": "10.9.1",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.4",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.68.0",
+    "vite": "7.3.6"
+  }
+}

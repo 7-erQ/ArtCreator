@@ -1,0 +1,50 @@
+name: 缺陷反馈
+description: 报告异常行为或运行问题
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: 请勿提交 API Key、个人服务地址、未脱敏日志或私人截图。
+  - type: input
+    id: version
+    attributes:
+      label: 应用版本
+      placeholder: "0.1.4"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 系统与使用版本
+      placeholder: Windows 11，x64，ZIP 绿色版
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: 图片服务
+      options:
+        - 不涉及图片服务
+        - OpenAI
+        - LiblibAI
+        - ComfyUI
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 描述触发问题的最少操作。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 可以附脱敏后的截图或错误信息。
+    validations:
+      required: true
