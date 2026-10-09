@@ -1,6 +1,6 @@
 {
   "name": "art-creator",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Capture a screen region and generate a pinned visual asset with AI.",
   "license": "MIT",
