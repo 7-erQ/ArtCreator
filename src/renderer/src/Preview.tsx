@@ -1,3 +1,5 @@
+import { useLanguage } from './useLanguage'
+import { t } from '../../shared/language'
 import { useEffect, useRef, useState } from 'react'
 import type { PreviewViewState, ScreenPointDip } from '../../shared/contracts'
 import { movementDelta, screenPoint } from '../../shared/preview-geometry'
@@ -49,6 +51,7 @@ const ACTION_TEXT = {
 } as const
 
 export function Preview(): React.JSX.Element {
+  useLanguage()
   const query = new URLSearchParams(window.location.search)
   const jobId = query.get('jobId') ?? ''
   const debugGenerationEffect = query.get('debugGenerationEffect') === '1'
@@ -441,26 +444,24 @@ export function Preview(): React.JSX.Element {
   const hasPlaceholder = Boolean(placeholderDataUrl)
   const cloneMode = shiftPressed || cloneDragging
   const fileDragMode = ctrlPressed && !cloneMode
-  const actionText = job?.pendingAction ? ACTION_TEXT[job.pendingAction] : undefined
+  const actionText = job?.pendingAction ? t(ACTION_TEXT[job.pendingAction]) : undefined
   const defaultStatusText = debugGenerationEffect
-    ? `特效调试 · ${getGenerationEffectScheme(effectScheme).label} · ${
-      debugEffectStatus === 'processing_prompt'
-        ? '理解提示词'
-        : debugEffectStatus === 'generating' ? '绘制素材' : '准备预览'
-    }`
+    ? t('特效调试 · {0} · {1}', t(getGenerationEffectScheme(effectScheme).label), debugEffectStatus === 'processing_prompt'
+        ? t('理解提示词')
+        : debugEffectStatus === 'generating' ? t('绘制素材') : t('准备预览'))
     : isProcessing && retainsImage && actionText
-      ? `正在${actionText}，保留当前图片`
+      ? t('正在{0}，保留当前图片', actionText)
       : job?.status === 'failed' && retainsImage && actionText
-        ? `${actionText}失败，已保留上一版`
-        : job?.error?.message ?? (job ? STATUS_TEXT[job.status] : '正在创建预览')
+        ? t('{0}失败，已保留上一版', actionText)
+        : t(job?.error?.message) || (job ? t(STATUS_TEXT[job.status]) : t('正在创建预览'))
 
   const progress = job?.generationProgress
   const statusText = !debugGenerationEffect && progress && progress.total > 1
     ? job?.status === 'failed' || job?.status === 'canceled'
-      ? `${STATUS_TEXT[job.status]}，已完成 ${progress.completed} / ${progress.total} 张，保留当前图片`
+      ? t('{0}，已完成 {1} / {2} 张，保留当前图片', t(STATUS_TEXT[job.status]), progress.completed, progress.total)
       : job?.status === 'generating'
-        ? `正在${actionText ?? '生成素材'}，已完成 ${progress.completed} / ${progress.total} 张`
-        : `${job ? STATUS_TEXT[job.status] : ''}（${progress.completed} / ${progress.total} 张）`
+        ? t('正在{0}，已完成 {1} / {2} 张', actionText ?? t('生成素材'), progress.completed, progress.total)
+        : t('{0}（{1} / {2} 张）', job ? t(STATUS_TEXT[job.status]) : '', progress.completed, progress.total)
     : defaultStatusText
 
   return (
@@ -495,7 +496,7 @@ export function Preview(): React.JSX.Element {
           <img
             className={`preview-image ${imageVisible ? 'image-visible' : ''}`}
             src={state.imageDataUrl}
-            alt="生成的素材"
+            alt={t('生成的素材')}
             draggable={fileDragMode}
             onLoad={() => {
               setImageVisible(true)
@@ -524,48 +525,48 @@ export function Preview(): React.JSX.Element {
 
       <div
         className={`preview-status status-${job?.status ?? 'processing_prompt'}`}
-        title={job?.error?.message ? `${statusText}：${job.error.message}` : statusText}
+        title={job?.error?.message ? `${statusText}: ${t(job.error.message)}` : statusText}
       >{statusText}</div>
-      {notice && <div className="preview-notice">{notice}</div>}
+      {notice && <div className="preview-notice">{t(notice)}</div>}
 
       {(state?.previousVersionId || state?.nextVersionId) && (
-        <nav className="preview-history" aria-label="历史图片切换">
+        <nav className="preview-history" aria-label={t('历史图片切换')}>
           <button
             className="preview-history-previous"
-            aria-label="上一个历史版本"
-            title="上一个历史版本"
+            aria-label={t('上一个历史版本')}
+            title={t('上一个历史版本')}
             disabled={historyBusy || !state.previousVersionId}
             onClick={() => state.previousVersionId && void switchVersion(state.previousVersionId)}
           >{'<'}</button>
           <button
             className="preview-history-next"
-            aria-label="下一个历史版本"
-            title="下一个历史版本"
+            aria-label={t('下一个历史版本')}
+            title={t('下一个历史版本')}
             disabled={historyBusy || !state.nextVersionId}
             onClick={() => state.nextVersionId && void switchVersion(state.nextVersionId)}
           >{'>'}</button>
         </nav>
       )}
 
-      <nav className="preview-toolbar preview-actions-expanded" aria-label="预览操作">
-        <button disabled={!retainsImage} onClick={() => void copy()} title="复制图片">复制</button>
-        <button disabled={!retainsImage} onClick={() => void save()} title="保存 PNG">保存</button>
-        <button onClick={() => void window.artCreator.preview.openDetails(jobId)} title="编辑提示词">编辑</button>
+      <nav className="preview-toolbar preview-actions-expanded" aria-label={t('预览操作')}>
+        <button disabled={!retainsImage} onClick={() => void copy()} title={t('复制图片')}>{t('复制')}</button>
+        <button disabled={!retainsImage} onClick={() => void save()} title={t('保存 PNG')}>{t('保存')}</button>
+        <button onClick={() => void window.artCreator.preview.openDetails(jobId)} title={t('编辑提示词')}>{t('编辑')}</button>
         <button
           disabled={!isBusy && !job?.assetSpec}
           onClick={() => void (isBusy ? cancelGeneration() : regenerate())}
-          title={isBusy ? '取消生成' : `重新生成 ${job?.selection.generationCount ?? 1} 张`}
-        >{isBusy ? '取消生成' : '重生成'}</button>
-        <button onClick={() => void startCapture()} title="开始新的截图生成任务">新截图</button>
-        <button onClick={() => void enableClickThrough()} title="启用鼠标穿透">穿透</button>
-        <button onClick={() => void window.artCreator.preview.close(jobId)} title="关闭预览">关闭</button>
+          title={isBusy ? t('取消生成') : t('重新生成 {0} 张', job?.selection.generationCount ?? 1)}
+        >{isBusy ? t('取消生成') : t('重生成')}</button>
+        <button onClick={() => void startCapture()} title={t('开始新的截图生成任务')}>{t('新截图')}</button>
+        <button onClick={() => void enableClickThrough()} title={t('启用鼠标穿透')}>{t('穿透')}</button>
+        <button onClick={() => void window.artCreator.preview.close(jobId)} title={t('关闭预览')}>{t('关闭')}</button>
       </nav>
 
       <button
         className="preview-menu-button"
         onClick={showMoreMenu}
-        aria-label="更多选项"
-        title="更多选项"
+        aria-label={t('更多选项')}
+        title={t('更多选项')}
       >•••</button>
     </main>
   )

@@ -1,3 +1,5 @@
+import { useLanguage } from './useLanguage'
+import { localizedError, t, message as msg, type LocalizedText } from '../../shared/language'
 import { useMemo, useState } from 'react'
 import {
   comfyUiWorkflowBindingSchema,
@@ -105,12 +107,13 @@ export function ComfyUiWorkflowBindingsEditor({
   disabled: boolean
   onChange: (bindings: ComfyUiWorkflowBinding[]) => void
 }): React.JSX.Element {
+  useLanguage()
   const [workflows, setWorkflows] = useState<ComfyUiWorkflowSummary[]>([])
   const [selectedPath, setSelectedPath] = useState('')
   const [descriptor, setDescriptor] = useState<ComfyUiWorkflowDescriptor>()
   const [draft, setDraft] = useState<BindingDraft>(() => draftFromBinding())
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState<LocalizedText>('')
   const [messageIsError, setMessageIsError] = useState(false)
   const selectedBinding = bindings.find((binding) => binding.workflowPath === selectedPath)
 
@@ -147,10 +150,10 @@ export function ComfyUiWorkflowBindingsEditor({
         : listed[0]?.path ?? ''
       if (nextPath !== selectedPath) selectWorkflowPath(nextPath)
       setMessage(listed.length > 0
-        ? `发现 ${listed.length} 个 ComfyUI 工作流。`
+        ? msg('发现 {0} 个 ComfyUI 工作流。', listed.length)
         : 'ComfyUI 中没有可配置的 JSON 工作流。')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '读取 ComfyUI 工作流失败。')
+      setMessage(localizedError(error, '读取 ComfyUI 工作流失败。'))
       setMessageIsError(true)
     } finally {
       setLoading(false)
@@ -165,10 +168,10 @@ export function ComfyUiWorkflowBindingsEditor({
     try {
       const value = await window.artCreator.settings.inspectComfyUiWorkflow(baseUrl, selectedPath)
       setDescriptor(value)
-      setMessage(`已读取 ${value.nodes.length} 个节点；请选择语义绑定。`)
+      setMessage(msg('已读取 {0} 个节点；请选择语义绑定。', value.nodes.length))
     } catch (error) {
       setDescriptor(undefined)
-      setMessage(error instanceof Error ? error.message : '解析 ComfyUI 工作流失败。')
+      setMessage(localizedError(error, '解析 ComfyUI 工作流失败。'))
       setMessageIsError(true)
     } finally {
       setLoading(false)
@@ -229,68 +232,68 @@ export function ComfyUiWorkflowBindingsEditor({
   return (
     <details className="workflow-bindings" open={Boolean(descriptor)}>
       <summary>
-        <span>已有工作流绑定</span>
-        <em>{bindings.length} 个已配置</em>
+        <span>{t('已有工作流绑定')}</span>
+        <em>{bindings.length} {t(' 个已配置')}</em>
       </summary>
       <div className="workflow-bindings-body">
         <div className="workflow-binding-toolbar">
           <select
-            aria-label="ComfyUI 已保存工作流"
+            aria-label={t('ComfyUI 已保存工作流')}
             value={selectedPath}
             onChange={(event) => selectWorkflowPath(event.target.value)}
             disabled={disabled || loading}
           >
-            <option value="">选择 ComfyUI 工作流</option>
+            <option value="">{t('选择 ComfyUI 工作流')}</option>
             {workflows.map((workflow) => (
               <option key={workflow.path} value={workflow.path}>{workflowLabel(workflow.path)}</option>
             ))}
           </select>
           <button type="button" onClick={() => void loadWorkflows()} disabled={disabled || loading}>
-            {loading ? '读取中…' : '刷新列表'}
+            {loading ? t('读取中…') : t('刷新列表')}
           </button>
           <button
             type="button"
             onClick={() => void inspectWorkflow()}
             disabled={disabled || loading || !selectedPath}
-          >读取节点</button>
+          >{t('读取节点')}</button>
         </div>
 
         {descriptor && (
           <div className="workflow-binding-editor">
             <div className="workflow-binding-grid">
               <label>
-                <span>正向提示词输入</span>
+                <span>{t('正向提示词输入')}</span>
                 <select value={draft.prompt} onChange={(event) => setDraft((current) => ({
                   ...current, prompt: event.target.value
                 }))}>
-                  <option value="">请选择</option>
+                  <option value="">{t('请选择')}</option>
                   {stringInputs.map((input) => <option key={input.value} value={input.value}>{input.label}</option>)}
                 </select>
               </label>
               <label>
-                <span>负向提示词输入（可选）</span>
+                <span>{t('负向提示词输入（可选）')}</span>
                 <select value={draft.negativePrompt} onChange={(event) => setDraft((current) => ({
                   ...current, negativePrompt: event.target.value
                 }))}>
-                  <option value="">不覆盖</option>
+                  <option value="">{t('不覆盖')}</option>
                   {stringInputs.map((input) => <option key={input.value} value={input.value}>{input.label}</option>)}
                 </select>
               </label>
               <label>
-                <span>Seed 输入（可选）</span>
+                <span>{t('Seed 输入（可选）')}</span>
                 <select value={draft.seed} onChange={(event) => setDraft((current) => ({
                   ...current, seed: event.target.value
                 }))}>
-                  <option value="">使用工作流原值</option>
+                  <option value="">{t('使用工作流原值')}</option>
                   {numberInputs.map((input) => <option key={input.value} value={input.value}>{input.label}</option>)}
                 </select>
               </label>
               <label>
-                <span>最终输出节点</span>
+                <span>{t('最终输出节点')}</span>
                 <select value={draft.outputNodeId} onChange={(event) => setDraft((current) => ({
                   ...current, outputNodeId: event.target.value
                 }))}>
-                  <option value="">请选择</option>
+                  <option value="">{t('请选择')}</option>
                   {outputNodes.map((node) => (
                     <option key={node.id} value={node.id}>#{node.id} {node.title}</option>
                   ))}
@@ -306,7 +309,7 @@ export function ComfyUiWorkflowBindingsEditor({
                   ...current, transparentOutput: event.target.checked
                 }))}
               />
-              <span>此工作流最终输出包含透明背景</span>
+              <span>{t('此工作流最终输出包含透明背景')}</span>
             </label>
 
             <div className="workflow-mode-list">
@@ -320,18 +323,18 @@ export function ComfyUiWorkflowBindingsEditor({
                         checked={modeDraft.enabled}
                         onChange={(event) => updateMode(mode, { enabled: event.target.checked })}
                       />
-                      <strong>{MODE_LABELS[mode]}</strong>
+                      <strong>{t(MODE_LABELS[mode])}</strong>
                     </label>
                     {modeDraft.enabled && (
                       <div className="workflow-mode-fields">
                         {mode !== 'generate' && (
                           <label>
-                            <span>{mode === 'reference' ? '参考图输入' : '重绘源图输入'}</span>
+                            <span>{mode === 'reference' ? t('参考图输入') : t('重绘源图输入')}</span>
                             <select
                               value={modeDraft.sourceImage}
                               onChange={(event) => updateMode(mode, { sourceImage: event.target.value })}
                             >
-                              <option value="">请选择</option>
+                              <option value="">{t('请选择')}</option>
                               {stringInputs.map((input) => (
                                 <option key={input.value} value={input.value}>{input.label}</option>
                               ))}
@@ -340,12 +343,12 @@ export function ComfyUiWorkflowBindingsEditor({
                         )}
                         {mode === 'inpaint' && (
                           <label>
-                            <span>Mask 输入</span>
+                            <span>{t('Mask 输入')}</span>
                             <select
                               value={modeDraft.maskImage}
                               onChange={(event) => updateMode(mode, { maskImage: event.target.value })}
                             >
-                              <option value="">请选择</option>
+                              <option value="">{t('请选择')}</option>
                               {stringInputs.map((input) => (
                                 <option key={input.value} value={input.value}>{input.label}</option>
                               ))}
@@ -353,7 +356,7 @@ export function ComfyUiWorkflowBindingsEditor({
                           </label>
                         )}
                         <label>
-                          <span>此模式强制启用的节点</span>
+                          <span>{t('此模式强制启用的节点')}</span>
                           <select
                             multiple
                             size={4}
@@ -372,7 +375,7 @@ export function ComfyUiWorkflowBindingsEditor({
                           </select>
                         </label>
                         <label>
-                          <span>此模式强制旁路的节点</span>
+                          <span>{t('此模式强制旁路的节点')}</span>
                           <select
                             multiple
                             size={4}
@@ -398,14 +401,14 @@ export function ComfyUiWorkflowBindingsEditor({
             </div>
 
             <div className="workflow-binding-actions">
-              <button type="button" onClick={saveBinding}>保存绑定到草稿</button>
-              {selectedBinding && <button type="button" onClick={removeBinding}>移除绑定</button>}
+              <button type="button" onClick={saveBinding}>{t('保存绑定到草稿')}</button>
+              {selectedBinding && <button type="button" onClick={removeBinding}>{t('移除绑定')}</button>}
             </div>
           </div>
         )}
 
         <p className={messageIsError ? 'connection-test-result error' : 'connection-test-note'} aria-live="polite">
-          {message || '直接读取 ComfyUI 保存的画布；无需导出 API 格式。'}
+          {t(message) || t('直接读取 ComfyUI 保存的画布；无需导出 API 格式。')}
         </p>
       </div>
     </details>

@@ -1,3 +1,4 @@
+import { t } from '../shared/language'
 import {
   desktopCapturer,
   type Display,
@@ -49,14 +50,14 @@ export async function captureDisplaySnapshots(
     const displayId = String(display.id)
     const source = sourceByDisplay.get(displayId)
     if (!source || source.thumbnail.isEmpty()) {
-      throw new Error(`未找到显示器 ${display.id} 的屏幕图像。`)
+      throw new Error(t('未找到显示器 {0} 的屏幕图像。', display.id))
     }
     const pixelSize = pixelSizes.get(displayId)!
     const sourceSize = source.thumbnail.getSize()
     const image = sourceSize.width === pixelSize.width && sourceSize.height === pixelSize.height
       ? source.thumbnail
       : source.thumbnail.resize({ ...pixelSize, quality: 'best' })
-    if (image.isEmpty()) throw new Error(`显示器 ${display.id} 的屏幕图像无效。`)
+    if (image.isEmpty()) throw new Error(t('显示器 {0} 的屏幕图像无效。', display.id))
     snapshots.set(displayId, { display, image })
   }
 

@@ -1,3 +1,5 @@
+import { useLanguage } from './useLanguage'
+import { t } from '../../shared/language'
 import { type FormEvent, useEffect, useState } from 'react'
 import {
   UPSCALE_DIMENSION_MAX,
@@ -14,6 +16,7 @@ function initialDimension(value: string | null): number {
 }
 
 export function UpscaleDialog(): React.JSX.Element {
+  useLanguage()
   const query = new URLSearchParams(window.location.search)
   const jobId = query.get('jobId') ?? ''
   const initialWidth = initialDimension(query.get('width'))
@@ -90,21 +93,21 @@ export function UpscaleDialog(): React.JSX.Element {
       <header className="upscale-dialog-header">
         <div>
           <p>RESIZE OUTPUT</p>
-          <h1>放大 / 改尺寸</h1>
+          <h1>{t('放大 / 改尺寸')}</h1>
         </div>
         <button
           className="upscale-close-button"
           type="button"
           onClick={() => window.close()}
           disabled={submitting}
-          aria-label="关闭尺寸弹窗"
+          aria-label={t('关闭尺寸弹窗')}
         >×</button>
       </header>
 
       <form onSubmit={(event) => void submit(event)} noValidate>
         <div className="upscale-dimension-row">
           <label>
-            <span>图宽</span>
+            <span>{t('图宽')}</span>
             <input
               autoFocus
               type="number"
@@ -115,7 +118,7 @@ export function UpscaleDialog(): React.JSX.Element {
               value={width}
               onChange={(event) => updateWidth(event.target.value)}
               disabled={submitting}
-              aria-label="图宽"
+              aria-label={t('图宽')}
             />
           </label>
 
@@ -124,9 +127,9 @@ export function UpscaleDialog(): React.JSX.Element {
             type="button"
             onClick={toggleRatioLock}
             disabled={submitting}
-            aria-label={locked ? '解锁宽高比例' : '锁定宽高比例'}
+            aria-label={locked ? t('解锁宽高比例') : t('锁定宽高比例')}
             aria-pressed={locked}
-            title={locked ? '已锁定比例' : '未锁定比例'}
+            title={locked ? t('已锁定比例') : t('未锁定比例')}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d={locked
@@ -136,7 +139,7 @@ export function UpscaleDialog(): React.JSX.Element {
           </button>
 
           <label>
-            <span>图高</span>
+            <span>{t('图高')}</span>
             <input
               type="number"
               inputMode="numeric"
@@ -146,19 +149,19 @@ export function UpscaleDialog(): React.JSX.Element {
               value={height}
               onChange={(event) => updateHeight(event.target.value)}
               disabled={submitting}
-              aria-label="图高"
+              aria-label={t('图高')}
             />
           </label>
         </div>
 
         <div className="upscale-dialog-footer">
           <p className={notice ? 'is-error' : ''}>
-            {notice || `支持 ${UPSCALE_DIMENSION_MIN}–${UPSCALE_DIMENSION_MAX} px 整数尺寸`}
+            {t(notice) || t('支持 {0}–{1} px 整数尺寸', UPSCALE_DIMENSION_MIN, UPSCALE_DIMENSION_MAX)}
           </p>
           <div>
-            <button type="button" onClick={() => window.close()} disabled={submitting}>取消</button>
+            <button type="button" onClick={() => window.close()} disabled={submitting}>{t('取消')}</button>
             <button className="upscale-confirm-button" type="submit" disabled={!dimensions.success || submitting}>
-              {submitting ? '处理中…' : '开始放大'}
+              {submitting ? t('处理中…') : t('开始放大')}
             </button>
           </div>
         </div>

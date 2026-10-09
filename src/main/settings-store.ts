@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { z } from 'zod'
+import { DEFAULT_LANGUAGE, languageSchema, t, type Language } from '../shared/language'
 import {
   apiBaseUrlSchema,
   comfyUiBaseUrlSchema,
@@ -109,6 +110,7 @@ const persistedSettingsV10Schema = persistedSettingsV9Schema.extend({
 
 const persistedSettingsSchema = persistedSettingsV10Schema.omit({ lastImageModel: true }).extend({
   version: z.literal(11),
+  language: languageSchema.default(DEFAULT_LANGUAGE),
   lastGenerationOptions: generationOptionsSchema
 })
 
@@ -159,6 +161,7 @@ export interface SecureValueCodec {
 function defaultSettings(): PersistedSettings {
   return {
     version: 11,
+    language: DEFAULT_LANGUAGE,
     hotkey: DEFAULT_HOTKEY,
     textBaseUrl: DEFAULT_OPENAI_BASE_URL,
     textModel: DEFAULT_TEXT_MODEL,
@@ -251,7 +254,7 @@ function migrateLegacySettings(
 function migrateSettings(stored: StoredSettings): PersistedSettings {
   if (stored.version === 11) return stored
   const { lastImageModel, ...legacy } = migrateLegacySettings(stored)
-  return { ...legacy, version: 11, lastGenerationOptions: defaultGenerationOptions(lastImageModel) }
+  return { ...legacy, version: 11, language: DEFAULT_LANGUAGE, lastGenerationOptions: defaultGenerationOptions(lastImageModel) }
 }
 
 function normalizeLastWorkflowSelection(settings: PersistedSettings): PersistedSettings {
@@ -280,6 +283,7 @@ function normalizeLastWorkflowSelection(settings: PersistedSettings): PersistedS
 
 export class SettingsStore {
   private state: PersistedSettings = defaultSettings()
+  private pendingUpdate: Promise<void> = Promise.resolve()
 
   constructor(
     private readonly filePath: string,
@@ -307,6 +311,7 @@ export class SettingsStore {
 
   getPublic(hotkeyError?: string): PublicSettings {
     return {
+      language: this.state.language,
       hotkey: this.state.hotkey,
       textBaseUrl: this.state.textBaseUrl,
       textModel: this.state.textModel,
@@ -330,6 +335,18 @@ export class SettingsStore {
 
   getHotkey(): string {
     return this.state.hotkey
+  }
+
+  getLanguage(): Language {
+    return this.state.language
+  }
+
+  async updateLanguage(language: Language): Promise<void> {
+    return this.enqueueUpdate(async () => {
+      const next = { ...this.state, language: languageSchema.parse(language) }
+      await this.write(next)
+      this.state = next
+    })
   }
 
   getPreviewMaxEdge(): number {
@@ -399,90 +416,104 @@ export class SettingsStore {
   }
 
   async update(update: SettingsUpdate): Promise<void> {
-    const workflowBindings = (update.comfyUiWorkflowBindings ?? this.state.comfyUiWorkflowBindings)
-      .map((binding) => structuredClone(binding))
-    const next: PersistedSettings = normalizeLastWorkflowSelection({
-      ...this.state,
-      hotkey: update.hotkey,
-      textBaseUrl: update.textBaseUrl,
-      textModel: update.textModel,
-      openaiImageBaseUrl: update.openaiImageBaseUrl,
-      liblibImageBaseUrl: update.liblibImageBaseUrl,
-      comfyUiBaseUrl: update.comfyUiBaseUrl,
-      comfyUiWorkflowBindings: workflowBindings,
-      previewMaxEdge: update.previewMaxEdge,
-      screenshotCompression: { ...update.screenshotCompression },
-      generationEffectChoice: update.generationEffectChoice
+    return this.enqueueUpdate(async () => {
+      const workflowBindings = (update.comfyUiWorkflowBindings ?? this.state.comfyUiWorkflowBindings)
+        .map((binding) => structuredClone(binding))
+      const next: PersistedSettings = normalizeLastWorkflowSelection({
+        ...this.state,
+        hotkey: update.hotkey,
+        textBaseUrl: update.textBaseUrl,
+        textModel: update.textModel,
+        openaiImageBaseUrl: update.openaiImageBaseUrl,
+        liblibImageBaseUrl: update.liblibImageBaseUrl,
+        comfyUiBaseUrl: update.comfyUiBaseUrl,
+        comfyUiWorkflowBindings: workflowBindings,
+        previewMaxEdge: update.previewMaxEdge,
+        screenshotCompression: { ...update.screenshotCompression },
+        generationEffectChoice: update.generationEffectChoice
+      })
+
+      if (update.textApiKey) {
+        if (!this.codec.isEncryptionAvailable()) {
+          throw new Error('Secure credential storage is unavailable on this device.')
+        }
+        next.encryptedTextApiKey = this.codec.encryptString(update.textApiKey).toString('base64')
+      }
+
+      if (update.openaiImageApiKey) {
+        if (!this.codec.isEncryptionAvailable()) {
+          throw new Error('Secure credential storage is unavailable on this device.')
+        }
+        next.encryptedOpenaiImageApiKey = this.codec.encryptString(update.openaiImageApiKey).toString('base64')
+      }
+
+      const accessKey = update.liblibAccessKey ?? this.getLiblibAccessKey()
+      const secretKey = update.liblibSecretKey ?? this.getLiblibSecretKey()
+      if (Boolean(accessKey) !== Boolean(secretKey)) {
+        throw new Error(t('LiblibAI AccessKey 和 SecretKey 必须同时配置。'))
+      }
+      if (update.liblibAccessKey || update.liblibSecretKey) {
+        if (!this.codec.isEncryptionAvailable()) {
+          throw new Error('Secure credential storage is unavailable on this device.')
+        }
+        if (update.liblibAccessKey) {
+          next.encryptedLiblibAccessKey = this.codec.encryptString(update.liblibAccessKey).toString('base64')
+        }
+        if (update.liblibSecretKey) {
+          next.encryptedLiblibSecretKey = this.codec.encryptString(update.liblibSecretKey).toString('base64')
+        }
+      }
+
+      await this.write(next)
+      this.state = next
     })
-
-    if (update.textApiKey) {
-      if (!this.codec.isEncryptionAvailable()) {
-        throw new Error('Secure credential storage is unavailable on this device.')
-      }
-      next.encryptedTextApiKey = this.codec.encryptString(update.textApiKey).toString('base64')
-    }
-
-    if (update.openaiImageApiKey) {
-      if (!this.codec.isEncryptionAvailable()) {
-        throw new Error('Secure credential storage is unavailable on this device.')
-      }
-      next.encryptedOpenaiImageApiKey = this.codec.encryptString(update.openaiImageApiKey).toString('base64')
-    }
-
-    const accessKey = update.liblibAccessKey ?? this.getLiblibAccessKey()
-    const secretKey = update.liblibSecretKey ?? this.getLiblibSecretKey()
-    if (Boolean(accessKey) !== Boolean(secretKey)) {
-      throw new Error('LiblibAI AccessKey 和 SecretKey 必须同时配置。')
-    }
-    if (update.liblibAccessKey || update.liblibSecretKey) {
-      if (!this.codec.isEncryptionAvailable()) {
-        throw new Error('Secure credential storage is unavailable on this device.')
-      }
-      if (update.liblibAccessKey) {
-        next.encryptedLiblibAccessKey = this.codec.encryptString(update.liblibAccessKey).toString('base64')
-      }
-      if (update.liblibSecretKey) {
-        next.encryptedLiblibSecretKey = this.codec.encryptString(update.liblibSecretKey).toString('base64')
-      }
-    }
-
-    await this.write(next)
-    this.state = next
   }
 
   async updateCaptureOverlayProtection(enabled: boolean): Promise<void> {
-    const next: PersistedSettings = {
-      ...this.state,
-      captureOverlayProtection: enabled
-    }
-    await this.write(next)
-    this.state = next
+    return this.enqueueUpdate(async () => {
+      const next: PersistedSettings = {
+        ...this.state,
+        captureOverlayProtection: enabled
+      }
+      await this.write(next)
+      this.state = next
+    })
   }
 
   async updateLastGenerationOptions(options: GenerationOptions): Promise<void> {
-    const parsed = generationOptionsSchema.parse(options)
-    const imageModel = parsed.imageModel
-    if (imageModel.provider === 'comfyui' && 'workflowPath' in imageModel &&
-      !this.state.comfyUiWorkflowBindings.some((binding) =>
-        binding.workflowPath === imageModel.workflowPath)) {
-      throw new Error('Cannot persist an unconfigured ComfyUI workflow selection.')
-    }
-    const next = normalizeLastWorkflowSelection({ ...this.state, lastGenerationOptions: parsed })
-    await this.write(next)
-    this.state = next
+    return this.enqueueUpdate(async () => {
+      const parsed = generationOptionsSchema.parse(options)
+      const imageModel = parsed.imageModel
+      if (imageModel.provider === 'comfyui' && 'workflowPath' in imageModel &&
+        !this.state.comfyUiWorkflowBindings.some((binding) =>
+          binding.workflowPath === imageModel.workflowPath)) {
+        throw new Error('Cannot persist an unconfigured ComfyUI workflow selection.')
+      }
+      const next = normalizeLastWorkflowSelection({ ...this.state, lastGenerationOptions: parsed })
+      await this.write(next)
+      this.state = next
+    })
   }
 
   async clearCredential(target: CredentialTarget): Promise<void> {
-    credentialTargetSchema.parse(target)
-    const next = { ...this.state }
-    if (target === 'text') delete next.encryptedTextApiKey
-    else if (target === 'openai_image') delete next.encryptedOpenaiImageApiKey
-    else {
-      delete next.encryptedLiblibAccessKey
-      delete next.encryptedLiblibSecretKey
-    }
-    await this.write(next)
-    this.state = next
+    return this.enqueueUpdate(async () => {
+      credentialTargetSchema.parse(target)
+      const next = { ...this.state }
+      if (target === 'text') delete next.encryptedTextApiKey
+      else if (target === 'openai_image') delete next.encryptedOpenaiImageApiKey
+      else {
+        delete next.encryptedLiblibAccessKey
+        delete next.encryptedLiblibSecretKey
+      }
+      await this.write(next)
+      this.state = next
+    })
+  }
+
+  private enqueueUpdate(operation: () => Promise<void>): Promise<void> {
+    const result = this.pendingUpdate.then(operation)
+    this.pendingUpdate = result.catch(() => {})
+    return result
   }
 
   private async write(next: PersistedSettings): Promise<void> {

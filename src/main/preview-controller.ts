@@ -1,3 +1,4 @@
+import { t } from '../shared/language'
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -346,7 +347,7 @@ export class PreviewController {
     }))
     return imagePropertiesViewStateSchema.parse({
       jobId: id,
-      assetName: job.assetSpec?.assetName ?? '生成素材',
+      assetName: job.assetSpec?.assetName ?? t('生成素材'),
       versions,
       currentVersionId: this.options.generationManager.getCurrentResultVersionId(id),
       busy: job.status === 'processing_prompt' ||
@@ -367,7 +368,6 @@ export class PreviewController {
 
     this.propertiesJobId = id
     this.propertiesWindow = this.options.createWindow('properties', {
-      title: '图片属性',
       width: 700,
       height: 760,
       minWidth: 560,
@@ -418,7 +418,6 @@ export class PreviewController {
 
     this.detailsJobId = id
     this.detailsWindow = this.options.createWindow('details', {
-      title: '确认生成请求',
       width: 760,
       height: 760,
       minWidth: 560,
@@ -466,18 +465,18 @@ export class PreviewController {
     if (!job) throw new Error('Preview job no longer exists.')
     if (job.status === 'processing_prompt' || job.status === 'awaiting_confirmation' ||
       job.status === 'generating') {
-      throw new Error('生成进行中，暂时无法继续操作。')
+      throw new Error(t('生成进行中，暂时无法继续操作。'))
     }
     const currentImagePng = this.requireResult(id)
-    if (!this.options.onFollowUpCapture) throw new Error('后续编辑功能暂不可用。')
+    if (!this.options.onFollowUpCapture) throw new Error(t('后续编辑功能暂不可用。'))
     if (action === 'continue_edit' &&
       !supportsImageGeneration(job.selection.imageModel, 'reference')) {
-      throw new Error('当前模型不支持参考生成，无法继续编辑。')
+      throw new Error(t('当前模型不支持参考生成，无法继续编辑。'))
     }
     const screenshotPng = action === 'reconfigure'
       ? this.options.generationManager.getCaptureScreenshot(id)
       : undefined
-    if (action === 'reconfigure' && !screenshotPng) throw new Error('原始截屏已不可用。')
+    if (action === 'reconfigure' && !screenshotPng) throw new Error(t('原始截屏已不可用。'))
     const selection: CaptureSelection = action === 'continue_edit'
       ? { ...job.selection, imageGeneration: 'reference' }
       : job.selection
@@ -523,7 +522,6 @@ export class PreviewController {
     const output = resolveCaptureRegions(job.selection).outputRectDip
     const suggested = calculateImageLayout(output.width, output.height)
     const upscaleWindow = this.options.createWindow('upscale', {
-      title: '放大 / 改尺寸',
       width: 460,
       height: 300,
       parent: entry.window,
@@ -597,19 +595,19 @@ export class PreviewController {
     return [...this.instances.keys()].map((id) => {
       const entry = this.instances.get(id)!
       const job = this.options.generationManager.get(id)
-      const title = job?.assetSpec?.assetName ?? `生成任务 ${id.slice(0, 6)}`
+      const title = job?.assetSpec?.assetName ?? t('生成任务 {0}', id.slice(0, 6))
       return {
         label: title,
         submenu: [
           {
-            label: entry.clickThrough ? '恢复交互' : '显示预览',
+            label: entry.clickThrough ? t('恢复交互') : t('显示预览'),
             click: () => {
               this.setClickThrough(id, false)
               entry.window.show()
               entry.window.focus()
             }
           },
-          { label: '关闭', click: () => this.close(id) }
+          { label: t('关闭'), click: () => this.close(id) }
         ]
       }
     })
@@ -648,53 +646,53 @@ export class PreviewController {
       job.status !== 'generating' &&
       supportsImageGeneration(job.selection.imageModel, 'reference'))
     return [
-      { label: '开始新截图', click: this.options.onStartCapture },
+      { label: t('开始新截图'), click: this.options.onStartCapture },
       {
-        label: '重新配置…',
+        label: t('重新配置…'),
         enabled: canReconfigure,
         click: () => {
           void this.startFollowUp(id, 'reconfigure').catch((error) => dialog.showMessageBox(entry.window, {
             type: 'error',
-            title: '无法重新配置',
-            message: error instanceof Error ? error.message : '重新配置启动失败。'
+            title: t('无法重新配置'),
+            message: error instanceof Error ? error.message : t('重新配置启动失败。')
           }))
         }
       },
       {
-        label: '继续编辑',
+        label: t('继续编辑'),
         enabled: canContinueEdit,
         click: () => {
           void this.startFollowUp(id, 'continue_edit').catch((error) => dialog.showMessageBox(entry.window, {
             type: 'error',
-            title: '无法继续编辑',
-            message: error instanceof Error ? error.message : '继续编辑启动失败。'
+            title: t('无法继续编辑'),
+            message: error instanceof Error ? error.message : t('继续编辑启动失败。')
           }))
         }
       },
       { type: 'separator' },
-      { label: '复制图片', enabled: hasResult, click: () => void this.copy(id) },
-      { label: '保存 PNG…', enabled: hasResult, click: () => void this.save(id) },
+      { label: t('复制图片'), enabled: hasResult, click: () => void this.copy(id) },
+      { label: t('保存 PNG…'), enabled: hasResult, click: () => void this.save(id) },
       { type: 'separator' },
-      { label: '编辑提示词…', click: () => this.openDetails(id) },
-      { label: '重新生成', enabled: canRegenerate, click: () => this.regenerate(id) },
+      { label: t('编辑提示词…'), click: () => this.openDetails(id) },
+      { label: t('重新生成'), enabled: canRegenerate, click: () => this.regenerate(id) },
       {
-        label: '取消生成',
+        label: t('取消生成'),
         enabled: job?.status === 'processing_prompt' || job?.status === 'generating' ||
           job?.status === 'awaiting_confirmation',
         click: () => this.options.generationManager.cancel(id)
       },
       { type: 'separator' },
-      { label: '放大 / 改尺寸…', enabled: canProcess, click: () => this.openUpscaleDialog(id) },
-      { label: '精细处理', enabled: canProcess, click: () => this.process(id, { action: 'refine' }) },
-      { label: '抠图（实验）', enabled: canCutout, click: () => this.process(id, { action: 'cutout' }) },
+      { label: t('放大 / 改尺寸…'), enabled: canProcess, click: () => this.openUpscaleDialog(id) },
+      { label: t('精细处理'), enabled: canProcess, click: () => this.process(id, { action: 'refine' }) },
+      { label: t('抠图（实验）'), enabled: canCutout, click: () => this.process(id, { action: 'cutout' }) },
       { type: 'separator' },
-      { label: '属性…', enabled: hasResult, click: () => this.openProperties(id) },
+      { label: t('属性…'), enabled: hasResult, click: () => this.openProperties(id) },
       { type: 'separator' },
       {
-        label: entry.clickThrough ? '恢复交互' : '启用鼠标穿透',
+        label: entry.clickThrough ? t('恢复交互') : t('启用鼠标穿透'),
         click: () => this.setClickThrough(id, !entry.clickThrough)
       },
-      { label: '关闭', click: () => this.close(id) }
+      { label: t('关闭'), click: () => this.close(id) }
     ]
   }
 
@@ -730,7 +728,7 @@ export class PreviewController {
 
   private async savePng(owner: BrowserWindow, png: Buffer, fileName: string): Promise<boolean> {
     const choice = await dialog.showSaveDialog(owner, {
-      title: '保存生成素材',
+      title: t('保存生成素材'),
       defaultPath: fileName,
       filters: [{ name: 'PNG image', extensions: ['png'] }]
     })

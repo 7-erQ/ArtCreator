@@ -1,3 +1,5 @@
+import { useLanguage } from './useLanguage'
+import { localizedError, t, type LocalizedText } from '../../shared/language'
 import { useEffect, useState } from 'react'
 import {
   DEFAULT_GENERATION_EFFECT_CHOICE,
@@ -6,6 +8,7 @@ import {
 import { getGenerationEffectScheme } from './GenerationEffectScheme'
 
 export function DebugPanel(): React.JSX.Element {
+  useLanguage()
   const [imagePath, setImagePath] = useState('')
   const [effectChoice, setEffectChoice] = useState<GenerationEffectChoice>(
     DEFAULT_GENERATION_EFFECT_CHOICE
@@ -13,7 +16,7 @@ export function DebugPanel(): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [captureOverlayProtection, setCaptureOverlayProtection] = useState(true)
   const [savingProtection, setSavingProtection] = useState(false)
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState<LocalizedText>('')
   const [messageIsError, setMessageIsError] = useState(false)
 
   useEffect(() => {
@@ -60,7 +63,7 @@ export function DebugPanel(): React.JSX.Element {
         ? '加载特效调试窗已创建，阶段会自动循环。'
         : '调试悬浮窗已创建。')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '创建调试悬浮窗失败。')
+      setMessage(localizedError(error, '创建调试悬浮窗失败。'))
       setMessageIsError(true)
     } finally {
       setBusy(false)
@@ -79,7 +82,7 @@ export function DebugPanel(): React.JSX.Element {
       setMessage(enabled ? '选框录制保护已开启。' : '选框录制保护已关闭，Bandicam 可录制框选步骤。')
     } catch (error) {
       setCaptureOverlayProtection(previous)
-      setMessage(error instanceof Error ? error.message : '保存选框录制保护设置失败。')
+      setMessage(localizedError(error, '保存选框录制保护设置失败。'))
       setMessageIsError(true)
     } finally {
       setSavingProtection(false)
@@ -90,27 +93,25 @@ export function DebugPanel(): React.JSX.Element {
     <main className="debug-shell">
       <header className="debug-header">
         <p className="eyebrow">ART CREATOR / DEBUG</p>
-        <h1>调试面板</h1>
+        <h1>{t('调试面板')}</h1>
         <p className="debug-lede">
-          使用指定图片直接打开悬浮预览，方便验证拖动、克隆、穿透和关闭等交互。
-        </p>
+          {t('使用指定图片直接打开悬浮预览，方便验证拖动、克隆、穿透和关闭等交互。')}</p>
       </header>
 
       <section className="debug-card">
         <div className="debug-card-heading">
           <div>
             <span className="step">01</span>
-            <h2>图片预览</h2>
+            <h2>{t('图片预览')}</h2>
           </div>
-          <span className="debug-badge">不保存路径</span>
+          <span className="debug-badge">{t('不保存路径')}</span>
         </div>
         <p className="debug-card-description">
-          图片由主进程读取并按原始比例创建置顶悬浮窗，不会写入设置或项目目录。
-        </p>
+          {t('图片由主进程读取并按原始比例创建置顶悬浮窗，不会写入设置或项目目录。')}</p>
         <label>
-          <span>调试图片路径</span>
+          <span>{t('调试图片路径')}</span>
           <input
-            aria-label="调试图片路径"
+            aria-label={t('调试图片路径')}
             value={imagePath}
             onChange={(event) => {
               setImagePath(event.target.value)
@@ -122,23 +123,22 @@ export function DebugPanel(): React.JSX.Element {
           />
         </label>
         <div className="debug-effect-current">
-          <span>当前正式设置</span>
+          <span>{t('当前正式设置')}</span>
           <strong>
-            {effectChoice === 'random' ? '每个任务随机' : getGenerationEffectScheme(effectChoice).label}
+            {effectChoice === 'random' ? t('每个任务随机') : t(getGenerationEffectScheme(effectChoice).label)}
           </strong>
-          <small>请在主设置页的“生成加载特效”中修改，调试窗只负责预览当前选择。</small>
+          <small>{t('请在主设置页的“生成加载特效”中修改，调试窗只负责预览当前选择。')}</small>
         </div>
         <div className="debug-actions">
           <button className="debug-choose-button" type="button" onClick={() => void chooseImage()}>
-            选择图片
-          </button>
+            {t('选择图片')}</button>
           <button
             className="debug-create-button"
             type="button"
             disabled={busy || !imagePath.trim()}
             onClick={() => void createPreview()}
           >
-            {busy ? '正在创建…' : '创建悬浮窗'}
+            {busy ? t('正在创建…') : t('创建悬浮窗')}
           </button>
           <button
             className="debug-effect-button"
@@ -146,12 +146,12 @@ export function DebugPanel(): React.JSX.Element {
             disabled={busy || !imagePath.trim()}
             onClick={() => void createPreview(effectChoice)}
           >
-            {busy ? '正在创建…' : '预览加载特效'}
+            {busy ? t('正在创建…') : t('预览加载特效')}
           </button>
         </div>
         {message && (
           <p className={messageIsError ? 'debug-message error' : 'debug-message'} aria-live="polite">
-            {message}
+            {t(message)}
           </p>
         )}
 
@@ -159,26 +159,25 @@ export function DebugPanel(): React.JSX.Element {
         <div className="debug-card-heading">
           <div>
             <span className="step">02</span>
-            <h2>录制保护</h2>
+            <h2>{t('录制保护')}</h2>
           </div>
           <span className="debug-badge">
-            {captureOverlayProtection ? '已保护' : '可录制'}
+            {captureOverlayProtection ? t('已保护') : t('可录制')}
           </span>
         </div>
         <p className="debug-card-description">
-          默认保护截图浮层不被录屏软件捕获。关闭后可录制真实的框选操作，不影响截图数据或生图流程。
-        </p>
+          {t('默认保护截图浮层不被录屏软件捕获。关闭后可录制真实的框选操作，不影响截图数据或生图流程。')}</p>
         <label className="setting-toggle">
           <input
-            aria-label="保护截图选框不被录制"
+            aria-label={t('保护截图选框不被录制')}
             type="checkbox"
             checked={captureOverlayProtection}
             disabled={savingProtection}
             onChange={(event) => void updateCaptureOverlayProtection(event.target.checked)}
           />
           <span>
-            <strong>保护截图选框不被录制</strong>
-            <small>关闭后，Bandicam 等录屏软件可以录到截图选框和拖动过程。</small>
+            <strong>{t('保护截图选框不被录制')}</strong>
+            <small>{t('关闭后，Bandicam 等录屏软件可以录到截图选框和拖动过程。')}</small>
           </span>
         </label>
       </section>

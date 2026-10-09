@@ -1,3 +1,5 @@
+import { useLanguage } from './useLanguage'
+import { localizedError, t, message as msg, type LocalizedText } from '../../shared/language'
 import {
   useEffect,
   useMemo,
@@ -253,6 +255,7 @@ function CaptureSessionOverlay({
   screenshotUrl: string
   currentImageUrl?: string
 }): React.JSX.Element {
+  useLanguage()
   const initialSelection = state.initialSelection
   const initialOptions = initialSelection ?? state.defaultGenerationOptions
   const isContinueEdit = state.followUpAction === 'continue_edit'
@@ -319,7 +322,7 @@ function CaptureSessionOverlay({
   )
   const [instruction, setInstruction] = useState(initialSelection?.instruction ?? '')
   const [showCurrentImage, setShowCurrentImage] = useState(Boolean(currentImageUrl))
-  const [message, setMessage] = useState(initialSelection
+  const [message, setMessage] = useState<LocalizedText>(initialSelection
     ? isContinueEdit
       ? (initialSelection.referenceRectsDip?.length ?? 0) > MAX_REFERENCE_IMAGE_COUNT - 1
         ? '继续编辑最多4张（含当前图）；按 Esc 撤销最后一个超额蓝框后提交。'
@@ -436,7 +439,7 @@ function CaptureSessionOverlay({
           return
         }
 
-        const messages: string[] = []
+        const messages: LocalizedText[] = []
         if (currentModel.provider === 'comfyui') {
           const workflowAvailable = isComfyUiWorkflowSelection(currentModel) &&
             state.comfyUiWorkflowBindings.some((binding) =>
@@ -470,10 +473,10 @@ function CaptureSessionOverlay({
               } else {
                 setTransparentBackground(false)
               }
-              messages.push('上次使用的 ComfyUI 方案已不存在，已选择列表第一项')
+              messages.push(msg('上次使用的 ComfyUI 方案已不存在，已选择列表第一项'))
             } else {
               setImageModel({ provider: 'openai', model: 'gpt-image-2' })
-              messages.push('没有可用的 ComfyUI 方案，已切换到 OpenAI')
+              messages.push(msg('没有可用的 ComfyUI 方案，已切换到 OpenAI'))
             }
           }
         }
@@ -490,11 +493,11 @@ function CaptureSessionOverlay({
               ? DEFAULT_COMFYUI_GENERATION_OPTIONS.scheduler
               : capabilities.schedulers[0]!
           if (samplerName !== currentOptions.samplerName || scheduler !== currentOptions.scheduler) {
-            messages.push('不可用的采样参数已按服务列表确定性回退')
+            messages.push(msg('不可用的采样参数已按服务列表确定性回退'))
           }
           setComfyUiGenerationOptions((current) => ({ ...current, samplerName, scheduler }))
         }
-        if (messages.length > 0) setMessage(`${messages.join('；')}。`)
+        if (messages.length > 0) setMessage(messages.reduce((combined, next) => msg('{0}；{1}', combined, next)))
       })
       .catch(() => {
         if (!active) return
@@ -523,8 +526,8 @@ function CaptureSessionOverlay({
       )
       setImageGeneration(fallback)
       setMessage(fallback === 'inpaint'
-        ? `${definition.label} 仅支持局部重绘；请先涂画 mask。`
-        : `${definition.label} 不支持当前模式，已切换为${IMAGE_GENERATION_LABELS[fallback]}。`)
+        ? msg('{0} 仅支持局部重绘；请先涂画 mask。', definition.label)
+        : msg('{0} 不支持当前模式，已切换为{1}。', definition.label, msg(IMAGE_GENERATION_LABELS[fallback])))
     }
     if (isComfyUiWorkflowSelection(next)) {
       setTransparentBackground(next.transparentOutput)
@@ -608,12 +611,12 @@ function CaptureSessionOverlay({
             mode !== 'inpaint')
           if (fallback) {
             setImageGeneration(fallback)
-            setMessage(`涂鸦 mask 已清空，已切换为${IMAGE_GENERATION_LABELS[fallback]}。`)
+            setMessage(msg('涂鸦 mask 已清空，已切换为{0}。', msg(IMAGE_GENERATION_LABELS[fallback])))
           } else {
             setMessage('涂鸦 mask 已清空；重新涂鸦后才能提交局部重绘。')
           }
         } else {
-          setMessage(`在${outputRect ? '红框' : '绿框'}内涂画局部重绘 mask`)
+          setMessage(msg('在{0}内涂画局部重绘 mask', msg(outputRect ? '红框' : '绿框')))
         }
         return
       }
@@ -751,7 +754,7 @@ function CaptureSessionOverlay({
               ? '可在空白处拖动，按顺序框选下一张蓝色参考图。'
               : '切换到参考生成后，可继续按顺序框选蓝色参考图。'
             : '参考图区域已达上限，可继续调整或确认生成。'
-      : `在${outputRect ? '红框' : '绿框'}内涂画局部重绘 mask`)
+      : msg('在{0}内涂画局部重绘 mask', msg(outputRect ? '红框' : '绿框')))
   }
 
   function beginMove(event: PointerEvent, kind: SelectionKind, rect: RectDip): void {
@@ -967,7 +970,7 @@ function CaptureSessionOverlay({
     if (interaction.kind === 'doodle') {
       setMessage(doodleStrokesRef.current.length > 0
         ? '可继续涂画局部重绘 mask，或输入素材说明后确认生成'
-        : `在${outputRect ? '红框' : '绿框'}内涂画局部重绘 mask`)
+        : msg('在{0}内涂画局部重绘 mask', msg(outputRect ? '红框' : '绿框')))
       setActiveInteraction(undefined)
       return
     }
@@ -1053,7 +1056,7 @@ function CaptureSessionOverlay({
       }, mode)
     } catch (error) {
       setSubmittingMode(undefined)
-      setMessage(error instanceof Error ? error.message : '提交失败。')
+      setMessage(localizedError(error, '提交失败。'))
     }
   }
 
@@ -1065,7 +1068,7 @@ function CaptureSessionOverlay({
       onPointerUp={endInteraction}
       onPointerCancel={endInteraction}
     >
-      <img className="capture-image" src={screenshotUrl} alt="冻结的屏幕画面" draggable={false} />
+      <img className="capture-image" src={screenshotUrl} alt={t('冻结的屏幕画面')} draggable={false} />
       <div className="capture-shade" />
 
       {contextRect && (
@@ -1083,7 +1086,7 @@ function CaptureSessionOverlay({
         <img
           className="reconfigure-current-image"
           src={currentImageUrl}
-          alt="悬浮窗当前图片"
+          alt={t('悬浮窗当前图片')}
           style={rectStyle(resolvedOutputRect)}
           draggable={false}
         />
@@ -1114,28 +1117,28 @@ function CaptureSessionOverlay({
           }}
         >
           <span className="selection-label context-label">
-            {outputRect ? '上下文' : '生成区域 / 上下文 / 默认参考'}
+            {outputRect ? t('上下文') : t('生成区域 / 上下文 / 默认参考')}
           </span>
           <ResizeHandles kind="context" onStart={beginResize} />
           <nav
             className="mark-mode-toolbar"
             style={markModeToolbarStyle(contextRect, displayBounds)}
-            aria-label="标记模式"
+            aria-label={t('标记模式')}
             onPointerDown={(event) => event.stopPropagation()}
           >
-            <span className="mark-mode-title">可选</span>
+            <span className="mark-mode-title">{t('可选')}</span>
             <button
               type="button"
               className={markMode === 'rectangle' ? 'active' : ''}
               aria-pressed={markMode === 'rectangle'}
               onClick={() => selectMarkMode('rectangle')}
-            >框选</button>
+            >{t('框选')}</button>
             <button
               type="button"
               className={markMode === 'doodle' ? 'active' : ''}
               aria-pressed={markMode === 'doodle'}
               onClick={() => selectMarkMode('doodle')}
-            >涂鸦</button>
+            >{t('涂鸦')}</button>
           </nav>
         </div>
       )}
@@ -1150,7 +1153,7 @@ function CaptureSessionOverlay({
             else beginMove(event, 'output', outputRect)
           }}
         >
-          <span className="selection-label output-label">生成区域</span>
+          <span className="selection-label output-label">{t('生成区域')}</span>
           <ResizeHandles kind="output" onStart={beginResize} />
         </div>
       )}
@@ -1162,9 +1165,7 @@ function CaptureSessionOverlay({
             left: resolvedOutputRect.x + resolvedOutputRect.width,
             top: resolvedOutputRect.y + resolvedOutputRect.height
           }}
-          aria-label={`生图尺寸 ${rectSizeLabel(resolvedOutputRect)} DIP${
-            resolvedOutputAspectRatio ? `，比例 ${resolvedOutputAspectRatio.label}` : ''
-          }`}
+          aria-label={t('生图尺寸 {0} DIP{1}', rectSizeLabel(resolvedOutputRect), resolvedOutputAspectRatio ? t('，比例 {0}', resolvedOutputAspectRatio.label) : '')}
         >
           {rectSizeLabel(resolvedOutputRect, resolvedOutputAspectRatio)}
         </span>
@@ -1180,7 +1181,7 @@ function CaptureSessionOverlay({
           }}
         >
           <span className="selection-label reference-label">
-            参考图{isContinueEdit ? index + 2 : index + 1}
+            {t('参考图')}{isContinueEdit ? index + 2 : index + 1}
           </span>
           <ResizeHandles kind="reference" referenceIndex={index} onStart={beginResize} />
         </div>
@@ -1192,7 +1193,7 @@ function CaptureSessionOverlay({
           style={rectStyle(resolvedOutputRect)}
           width={resolvedOutputRect.width}
           height={resolvedOutputRect.height}
-          aria-label="涂鸦标记画布"
+          aria-label={t('涂鸦标记画布')}
           onPointerDown={markMode === 'doodle' ? beginDoodleDraw : undefined}
         >
           {doodleStrokes.map((stroke, index) => (
@@ -1205,7 +1206,7 @@ function CaptureSessionOverlay({
         </svg>
       )}
 
-      <div className="capture-hint">{message}</div>
+      <div className="capture-hint">{t(message)}</div>
 
       {contextRect && !(interaction?.kind === 'context' && interaction.operation === 'draw') && (
         <section className="capture-toolbar" onPointerDown={(event) => event.stopPropagation()}>
@@ -1214,50 +1215,50 @@ function CaptureSessionOverlay({
             value={instruction}
             onChange={(event) => setInstruction(event.target.value)}
             maxLength={500}
-            placeholder="描述目标素材，例如：排行榜"
+            placeholder={t('描述目标素材，例如：排行榜')}
             autoFocus
           />
           <div className="phase-controls">
             <fieldset className="phase-control">
-              <legend>提示词处理</legend>
+              <legend>{t('提示词处理')}</legend>
               <div className="prompt-processing-options">
                 <div className="mode-switch">
                   <button
                     className={promptProcessing === 'direct' ? 'active' : ''}
                     onClick={() => selectPromptProcessing('direct')}
-                  >直接使用</button>
+                  >{t('直接使用')}</button>
                   <button
                     className={promptProcessing === 'polish' ? 'active' : ''}
                     onClick={() => selectPromptProcessing('polish')}
-                  >AI 润色（仅提示词）</button>
+                  >{t('AI 润色（仅提示词）')}</button>
                   <button
                     className={promptProcessing === 'polish_with_selection' ? 'active' : ''}
                     onClick={() => selectPromptProcessing('polish_with_selection')}
-                  >AI 润色（提示词 + 带生成区域标记的上下文截图）</button>
+                  >{t('AI 润色（提示词 + 带生成区域标记的上下文截图）')}</button>
                 </div>
                 {promptProcessing !== 'direct' && (
                   <label className="prompt-language-control">
-                    <span>润色后提示词语言</span>
+                    <span>{t('润色后提示词语言')}</span>
                     <select
-                      aria-label="AI 润色后提示词语言"
+                      aria-label={t('AI 润色后提示词语言')}
                       value={promptLanguage}
                       onChange={(event) => setPromptLanguage(event.target.value as PromptLanguage)}
                       disabled={requiresEnglish}
                     >
-                      <option value="en">英文</option>
-                      <option value="zh">中文</option>
+                      <option value="en">{t('英文')}</option>
+                      <option value="zh">{t('中文')}</option>
                     </select>
                   </label>
                 )}
               </div>
             </fieldset>
             <fieldset className="phase-control">
-              <legend>图片生成</legend>
+              <legend>{t('图片生成')}</legend>
               <div className="image-model-controls">
                 <label>
-                  <span>生图方案</span>
+                  <span>{t('生图方案')}</span>
                   <select
-                    aria-label="生图方案"
+                    aria-label={t('生图方案')}
                     value={imageModel.provider}
                     onChange={(event) => {
                       const provider = event.target.value as ImageProvider
@@ -1290,9 +1291,9 @@ function CaptureSessionOverlay({
                   </select>
                 </label>
                 <label>
-                  <span>模型</span>
+                  <span>{t('模型')}</span>
                   <select
-                    aria-label="生图模型"
+                    aria-label={t('生图模型')}
                     value={imageModelOptionValue(imageModel)}
                     onChange={(event) => {
                       const selected = providerModels.find(
@@ -1309,7 +1310,7 @@ function CaptureSessionOverlay({
                           !supportsImageGeneration(definition.selection, 'reference')}
                       >
                         {isComfyUiWorkflowSelection(definition.selection)
-                          ? `工作流 · ${definition.label}`
+                          ? t('工作流 · {0}', definition.label)
                           : definition.label}
                       </option>
                     ))}
@@ -1317,14 +1318,14 @@ function CaptureSessionOverlay({
                 </label>
               </div>
               <label className="generation-count-control">
-                <span>生图数量</span>
+                <span>{t('生图数量')}</span>
                 <select
-                  aria-label="生图数量"
+                  aria-label={t('生图数量')}
                   value={generationCount}
                   onChange={(event) => setGenerationCount(Number(event.target.value))}
                 >
                   {Array.from({ length: MAX_GENERATION_COUNT }, (_, index) => (
-                    <option key={index + 1} value={index + 1}>{index + 1} 张</option>
+                    <option key={index + 1} value={index + 1}>{index + 1} {t(' 张')}</option>
                   ))}
                 </select>
               </label>
@@ -1333,37 +1334,36 @@ function CaptureSessionOverlay({
                   className={imageGeneration === 'generate' ? 'active' : ''}
                   disabled={isContinueEdit || !supportsImageGeneration(imageModel, 'generate')}
                   onClick={() => setImageGeneration('generate')}
-                >从零生成</button>
+                >{t('从零生成')}</button>
                 <button
                   className={imageGeneration === 'reference' ? 'active' : ''}
                   disabled={isContinueEdit || !supportsImageGeneration(imageModel, 'reference')}
                   onClick={() => setImageGeneration('reference')}
-                >参考生成</button>
+                >{t('参考生成')}</button>
                 <button
                   className={imageGeneration === 'inpaint' ? 'active' : ''}
                   disabled={isContinueEdit || !hasDoodleMask ||
                     !supportsImageGeneration(imageModel, 'inpaint')}
                   onClick={() => setImageGeneration('inpaint')}
-                >局部重绘</button>
+                >{t('局部重绘')}</button>
               </div>
               {isContinueEdit && (
-                <small className="model-language-note">继续编辑固定使用参考生成。</small>
+                <small className="model-language-note">{t('继续编辑固定使用参考生成。')}</small>
               )}
               {!referenceModelReady && (
                 <small className="liblib-options-error" role="alert">
-                  当前模型不支持参考生成，请更换模型或撤销蓝色参考框后提交。
-                </small>
+                  {t('当前模型不支持参考生成，请更换模型或撤销蓝色参考框后提交。')}</small>
               )}
               {requiresEnglish && promptProcessing === 'direct' && (
-                <small className="model-language-note">该模型要求直接提示词使用英文。</small>
+                <small className="model-language-note">{t('该模型要求直接提示词使用英文。')}</small>
               )}
               <small className="model-language-note">
                 {comfyUiCapabilities === undefined
-                  ? '正在读取本地 ComfyUI 能力；这不会阻塞冻结画面。'
+                  ? t('正在读取本地 ComfyUI 能力；这不会阻塞冻结画面。')
                   : comfyUiCapabilities.available
-                    ? `ComfyUI 在线：${comfyUiCapabilities.checkpoints.length} 个 checkpoint，` +
-                      `${configuredWorkflowModels.length} 个已绑定工作流。`
-                    : 'ComfyUI 离线或没有可执行方案；其它供应商仍可使用。'}
+                    ? t('ComfyUI 在线：{0} 个 checkpoint，', comfyUiCapabilities.checkpoints.length) +
+                      t('{0} 个已绑定工作流。', configuredWorkflowModels.length)
+                    : t('ComfyUI 离线或没有可执行方案；其它供应商仍可使用。')}
               </small>
               {imageModel.provider === 'liblib' && (
                 <div className="liblib-generation-options">
@@ -1378,12 +1378,12 @@ function CaptureSessionOverlay({
                             promptMagic: event.target.checked
                           }))}
                         />
-                        <span>提示词智能优化</span>
+                        <span>{t('提示词智能优化')}</span>
                       </label>
                       <label className="liblib-number-option">
-                        <span>采样步数</span>
+                        <span>{t('采样步数')}</span>
                         <input
-                          aria-label="Star-3 采样步数"
+                          aria-label={t('Star-3 采样步数')}
                           type="number"
                           min={1}
                           max={100}
@@ -1396,9 +1396,9 @@ function CaptureSessionOverlay({
                       </label>
                       {imageGeneration === 'reference' && (
                         <label className="liblib-number-option">
-                          <span>去噪强度</span>
+                          <span>{t('去噪强度')}</span>
                           <input
-                            aria-label="Star-3 去噪强度"
+                            aria-label={t('Star-3 去噪强度')}
                             type="number"
                             min={0}
                             max={1}
@@ -1419,19 +1419,19 @@ function CaptureSessionOverlay({
                       checked={confirmBeforeGeneration}
                       onChange={(event) => setConfirmBeforeGeneration(event.target.checked)}
                     />
-                    <span>生成前确认</span>
+                    <span>{t('生成前确认')}</span>
                   </label>
                   {!liblibOptionsValid && (
-                    <small className="liblib-options-error">请输入有效的 Star-3 参数。</small>
+                    <small className="liblib-options-error">{t('请输入有效的 Star-3 参数。')}</small>
                   )}
                 </div>
               )}
               {imageModel.provider === 'comfyui' && !workflowSelection && comfyUiCapabilities?.available && (
-                <div className="liblib-generation-options" aria-label="ComfyUI 生成参数">
+                <div className="liblib-generation-options" aria-label={t('ComfyUI 生成参数')}>
                   <label className="liblib-number-option">
-                    <span>采样器</span>
+                    <span>{t('采样器')}</span>
                     <select
-                      aria-label="ComfyUI 采样器"
+                      aria-label={t('ComfyUI 采样器')}
                       value={comfyUiGenerationOptions.samplerName}
                       onChange={(event) => setComfyUiGenerationOptions((current) => ({
                         ...current,
@@ -1444,9 +1444,9 @@ function CaptureSessionOverlay({
                     </select>
                   </label>
                   <label className="liblib-number-option">
-                    <span>调度器</span>
+                    <span>{t('调度器')}</span>
                     <select
-                      aria-label="ComfyUI 调度器"
+                      aria-label={t('ComfyUI 调度器')}
                       value={comfyUiGenerationOptions.scheduler}
                       onChange={(event) => setComfyUiGenerationOptions((current) => ({
                         ...current,
@@ -1459,9 +1459,9 @@ function CaptureSessionOverlay({
                     </select>
                   </label>
                   <label className="liblib-number-option">
-                    <span>采样步数</span>
+                    <span>{t('采样步数')}</span>
                     <input
-                      aria-label="ComfyUI 采样步数"
+                      aria-label={t('ComfyUI 采样步数')}
                       type="number"
                       min={1}
                       max={100}
@@ -1488,9 +1488,9 @@ function CaptureSessionOverlay({
                     />
                   </label>
                   <label className="liblib-number-option">
-                    <span>去噪强度</span>
+                    <span>{t('去噪强度')}</span>
                     <input
-                      aria-label="ComfyUI 去噪强度"
+                      aria-label={t('ComfyUI 去噪强度')}
                       type="number"
                       min={0}
                       max={1}
@@ -1503,7 +1503,7 @@ function CaptureSessionOverlay({
                     />
                   </label>
                   <label className="liblib-number-option">
-                    <span>Seed（留空随机）</span>
+                    <span>{t('Seed（留空随机）')}</span>
                     <input
                       aria-label="ComfyUI Seed"
                       type="number"
@@ -1522,20 +1522,19 @@ function CaptureSessionOverlay({
                     />
                   </label>
                   {!comfyUiOptionsValid && (
-                    <small className="liblib-options-error">请输入服务支持的有效 ComfyUI 参数。</small>
+                    <small className="liblib-options-error">{t('请输入服务支持的有效 ComfyUI 参数。')}</small>
                   )}
                 </div>
               )}
               {workflowSelection && selectedWorkflowBinding && (
-                <div className="liblib-generation-options" aria-label="ComfyUI 工作流参数">
+                <div className="liblib-generation-options" aria-label={t('ComfyUI 工作流参数')}>
                   <small className="workflow-owned-note">
-                    直接执行已保存工作流；模型、采样器、步数和 CFG 使用工作流中的值。
-                  </small>
+                    {t('直接执行已保存工作流；模型、采样器、步数和 CFG 使用工作流中的值。')}</small>
                   {selectedWorkflowBinding.seed && (
                     <label className="liblib-number-option">
-                      <span>Seed（留空随机）</span>
+                      <span>{t('Seed（留空随机）')}</span>
                       <input
-                        aria-label="ComfyUI 工作流 Seed"
+                        aria-label={t('ComfyUI 工作流 Seed')}
                         type="number"
                         min={0}
                         max={Number.MAX_SAFE_INTEGER}
@@ -1555,8 +1554,8 @@ function CaptureSessionOverlay({
             <label
               className="capture-checkbox"
               title={workflowSelection
-                ? '透明背景由当前工作流绑定决定'
-                : '需要图片服务支持透明背景输出'}
+                ? t('透明背景由当前工作流绑定决定')
+                : t('需要图片服务支持透明背景输出')}
             >
               <input
                 type="checkbox"
@@ -1564,20 +1563,20 @@ function CaptureSessionOverlay({
                 onChange={(event) => setTransparentBackground(event.target.checked)}
                 disabled={Boolean(workflowSelection) || !modelDefinition.supportsTransparency}
               />
-              <span>{workflowSelection ? '透明背景（工作流决定）' : '透明背景（实验）'}</span>
+              <span>{workflowSelection ? t('透明背景（工作流决定）') : t('透明背景（实验）')}</span>
             </label>
           </div>
           <div className="toolbar-actions">
-            <button className="cancel-button" onClick={() => void window.artCreator.capture.cancel()}>取消</button>
+            <button className="cancel-button" onClick={() => void window.artCreator.capture.cancel()}>{t('取消')}</button>
             {state.canFakeGenerate && (
               <button
                 className="fake-generation-button"
                 disabled={Boolean(submittingMode) || !instruction.trim() ||
                   !inpaintReady || !referenceModelReady || !liblibOptionsValid || !comfyUiOptionsValid}
                 onClick={() => void submit('fake')}
-                title="仅开发环境：模拟生成阶段并将生成区域截图作为结果"
+                title={t('仅开发环境：模拟生成阶段并将生成区域截图作为结果')}
               >
-                {submittingMode === 'fake' ? '假生成中…' : '假生成'}
+                {submittingMode === 'fake' ? t('假生成中…') : t('假生成')}
               </button>
             )}
             <button
@@ -1585,7 +1584,7 @@ function CaptureSessionOverlay({
                 !inpaintReady || !referenceModelReady || !liblibOptionsValid || !comfyUiOptionsValid}
               onClick={() => void submit('generate')}
             >
-              {submittingMode === 'generate' ? '提交中…' : '确认生成'}
+              {submittingMode === 'generate' ? t('提交中…') : t('确认生成')}
             </button>
           </div>
         </section>
@@ -1593,8 +1592,8 @@ function CaptureSessionOverlay({
 
       {isLocked && (
         <div className="capture-locked">
-          <strong>已在另一块显示器开始选择</strong>
-          <span>本次会话只支持单屏单目标，按 Esc 可逐步撤销，全部撤销后关闭。</span>
+          <strong>{t('已在另一块显示器开始选择')}</strong>
+          <span>{t('本次会话只支持单屏单目标，按 Esc 可逐步撤销，全部撤销后关闭。')}</span>
         </div>
       )}
     </main>
@@ -1608,8 +1607,9 @@ interface PreparedOverlaySession {
 }
 
 export function CaptureOverlay(): React.JSX.Element {
+  useLanguage()
   const [prepared, setPrepared] = useState<PreparedOverlaySession>()
-  const [message, setMessage] = useState('截屏浮层已就绪')
+  const [message, setMessage] = useState<LocalizedText>('截屏浮层已就绪')
   const objectUrl = useRef<string | undefined>(undefined)
   const currentImageObjectUrl = useRef<string | undefined>(undefined)
   const sessionId = useRef<string | undefined>(undefined)
@@ -1699,7 +1699,7 @@ export function CaptureOverlay(): React.JSX.Element {
         await window.artCreator.capture.notifySessionReady(next.sessionId)
       } catch (error) {
         if (!disposed && sessionId.current === next.sessionId) {
-          setMessage(error instanceof Error ? error.message : '截屏浮层握手失败。')
+          setMessage(localizedError(error, '截屏浮层握手失败。'))
         }
       }
     }
@@ -1718,7 +1718,7 @@ export function CaptureOverlay(): React.JSX.Element {
 
     void window.artCreator.capture.notifyOverlayReady().catch((error: unknown) => {
       if (!disposed) {
-        setMessage(error instanceof Error ? error.message : '截屏浮层初始化失败。')
+        setMessage(localizedError(error, '截屏浮层初始化失败。'))
       }
     })
 
@@ -1731,7 +1731,7 @@ export function CaptureOverlay(): React.JSX.Element {
     }
   }, [])
 
-  if (!prepared) return <main className="capture-loading">{message}</main>
+  if (!prepared) return <main className="capture-loading">{t(message)}</main>
   return (
     <CaptureSessionOverlay
       key={prepared.state.sessionId}

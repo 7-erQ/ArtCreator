@@ -1,3 +1,4 @@
+import { t } from '../shared/language'
 import OpenAI from 'openai'
 import { z } from 'zod'
 import type {
@@ -84,12 +85,12 @@ function errorMessage(error: unknown): string {
 
 function failureResult(target: ConnectionTestInput['target'], error: unknown): ConnectionTestResult {
   const label = target === 'text'
-    ? '提示词'
+    ? t('提示词')
     : target === 'liblib'
       ? 'LiblibAI'
       : target === 'comfyui'
         ? 'ComfyUI'
-        : 'OpenAI 生图'
+        : t('OpenAI 生图')
   const status = errorStatus(error)
   const message = errorMessage(error)
   const providerCategory = typeof error === 'object' && error !== null &&
@@ -99,28 +100,28 @@ function failureResult(target: ConnectionTestInput['target'], error: unknown): C
     return {
       ok: false,
       message: target === 'liblib'
-        ? 'LiblibAI 配置认证失败，请检查 AccessKey、SecretKey 和 API 权益。'
-        : `${label}配置认证失败，请检查 API Key。`
+        ? t('LiblibAI 配置认证失败，请检查 AccessKey、SecretKey 和 API 权益。')
+        : t('{0}配置认证失败，请检查 API Key。', label)
     }
   }
   if (status === 429 || providerCategory === 'rate_limit') {
-    return { ok: false, message: `${label}测试请求受限，请稍后重试。` }
+    return { ok: false, message: t('{0}测试请求受限，请稍后重试。', label) }
   }
   if ((status !== undefined && status >= 500) || providerCategory === 'service') {
-    return { ok: false, message: `${label}服务暂时不可用，请稍后重试。` }
+    return { ok: false, message: t('{0}服务暂时不可用，请稍后重试。', label) }
   }
   if (error instanceof z.ZodError || message.includes('no png data') ||
     message.includes('invalid png') || message.includes('valid png')) {
-    return { ok: false, message: `${label}服务已响应，但返回格式不兼容。` }
+    return { ok: false, message: t('{0}服务已响应，但返回格式不兼容。', label) }
   }
   if (status !== undefined && status >= 400) {
-    return { ok: false, message: `${label}服务拒绝测试请求，请检查模型与 Base URL。` }
+    return { ok: false, message: t('{0}服务拒绝测试请求，请检查模型与 Base URL。', label) }
   }
   if (providerCategory === 'network' || providerCategory === 'timeout' ||
     /timed?\s*out|timeout|terminated|connection error|fetch failed/.test(message)) {
-    return { ok: false, message: `无法连接${label}服务，请检查 Base URL 和网络。` }
+    return { ok: false, message: t('无法连接{0}服务，请检查 Base URL 和网络。', label) }
   }
-  return { ok: false, message: `${label}配置测试失败，请稍后重试。` }
+  return { ok: false, message: t('{0}配置测试失败，请稍后重试。', label) }
 }
 
 function isPng(buffer: Buffer): boolean {
@@ -146,12 +147,12 @@ export async function testApiConnection(
     ? input.secretKey ?? saved.liblibSecretKey
     : undefined
   if (input.target === 'liblib' && (!accessKey || !secretKey)) {
-    return { ok: false, message: '请先输入或保存 LiblibAI AccessKey 和 SecretKey。' }
+    return { ok: false, message: t('请先输入或保存 LiblibAI AccessKey 和 SecretKey。') }
   }
   if (input.target !== 'liblib' && input.target !== 'comfyui' && !apiKey) {
     return {
       ok: false,
-      message: `请先输入或保存${input.target === 'text' ? '文本' : ' OpenAI 图片'} API Key。`
+      message: t('请先输入或保存{0} API Key。', t(input.target === 'text' ? '文本' : ' OpenAI 图片'))
     }
   }
 
@@ -167,7 +168,7 @@ export async function testApiConnection(
       } finally {
         clearTimeout(timeout)
       }
-      return { ok: true, message: 'ComfyUI 连接测试通过（未上传图片或提交工作流）。' }
+      return { ok: true, message: t('ComfyUI 连接测试通过（未上传图片或提交工作流）。') }
     }
 
     if (input.target === 'liblib') {
@@ -185,7 +186,7 @@ export async function testApiConnection(
       } finally {
         clearTimeout(timeout)
       }
-      return { ok: true, message: 'LiblibAI 配置测试通过（未提交生图任务）。' }
+      return { ok: true, message: t('LiblibAI 配置测试通过（未提交生图任务）。') }
     }
 
     const signal = new AbortController().signal
@@ -202,7 +203,7 @@ export async function testApiConnection(
         input.model,
         (sourcePng) => ({ data: sourcePng, mediaType: 'image/png' })
       ).polishPrompt(TEST_CAPTURE, signal)
-      return { ok: true, message: '提示词配置测试通过。' }
+      return { ok: true, message: t('提示词配置测试通过。') }
     }
 
     await new OpenAIImageGenerator(client, 'gpt-image-2', requestFetch).generate(
@@ -215,7 +216,7 @@ export async function testApiConnection(
         if (!isPng(png)) throw new Error('The image API returned an invalid PNG.')
       } }
     )
-    return { ok: true, message: 'OpenAI 生图配置测试通过。' }
+    return { ok: true, message: t('OpenAI 生图配置测试通过。') }
   } catch (error) {
     const status = errorStatus(error)
     const name = errorName(error)

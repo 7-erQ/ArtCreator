@@ -1,3 +1,5 @@
+import { useLanguage } from './useLanguage'
+import { localizedError, t, type LocalizedText } from '../../shared/language'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import {
   DEFAULT_STAR3_GENERATION_OPTIONS,
@@ -27,6 +29,7 @@ function validStar3Options(options: Star3GenerationOptions): boolean {
 }
 
 export function Details(): React.JSX.Element {
+  useLanguage()
   const initialId = new URLSearchParams(window.location.search).get('jobId') ?? ''
   const [jobId, setJobId] = useState(initialId)
   const [job, setJob] = useState<GenerationJobSnapshot>()
@@ -35,8 +38,8 @@ export function Details(): React.JSX.Element {
     ...DEFAULT_STAR3_GENERATION_OPTIONS
   })
   const [review, setReview] = useState<GenerationRequestReview>()
-  const [reviewError, setReviewError] = useState('')
-  const [message, setMessage] = useState('')
+  const [reviewError, setReviewError] = useState<LocalizedText>('')
+  const [message, setMessage] = useState<LocalizedText>('')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => window.artCreator.preview.onDetailsJobChanged(setJobId), [])
@@ -89,7 +92,7 @@ export function Details(): React.JSX.Element {
         .catch((error) => {
           if (!active) return
           setReview(undefined)
-          setReviewError(error instanceof Error ? error.message : '无法预览本次请求。')
+          setReviewError(localizedError(error, '无法预览本次请求。'))
         })
     }, 120)
     return () => {
@@ -113,7 +116,7 @@ export function Details(): React.JSX.Element {
       if (awaitingConfirmation) window.close()
     } catch (error) {
       setSubmitting(false)
-      setMessage(error instanceof Error ? error.message : '无法提交生成请求。')
+      setMessage(localizedError(error, '无法提交生成请求。'))
     }
   }
 
@@ -137,21 +140,21 @@ export function Details(): React.JSX.Element {
               ? `${job.selection.imageModel.provider.toUpperCase()} / ${model?.label} / ${PROMPT_PROCESSING_LABEL[job.selection.promptProcessing]} / ${IMAGE_GENERATION_LABEL[job.selection.imageGeneration]}`
               : 'PENDING'}
           </p>
-          <h1>{awaitingConfirmation ? '确认本次生成' : spec?.assetName ?? '正在整理素材规格'}</h1>
+          <h1>{awaitingConfirmation ? t('确认本次生成') : spec?.assetName ?? t('正在整理素材规格')}</h1>
         </div>
-        <button className="details-close" onClick={() => window.close()} aria-label="关闭详情窗">×</button>
+        <button className="details-close" onClick={() => window.close()} aria-label={t('关闭详情窗')}>×</button>
       </header>
 
       {spec ? (
         <form className="details-grid" onSubmit={(event) => void submit(event)}>
           <section className="spec-summary">
-            <div><span>主体</span><p>{spec.subject}</p></div>
-            <div><span>风格</span><p>{spec.style}</p></div>
-            <div><span>构图</span><p>{spec.composition}</p></div>
-            <div><span>比例</span><p>{spec.targetAspectRatio.toFixed(3)}</p></div>
+            <div><span>{t('主体')}</span><p>{spec.subject}</p></div>
+            <div><span>{t('风格')}</span><p>{spec.style}</p></div>
+            <div><span>{t('构图')}</span><p>{spec.composition}</p></div>
+            <div><span>{t('比例')}</span><p>{spec.targetAspectRatio.toFixed(3)}</p></div>
           </section>
           <label className="prompt-editor">
-            <span>生成提示词</span>
+            <span>{t('生成提示词')}</span>
             <textarea
               value={prompt}
               onChange={(event) => {
@@ -163,7 +166,7 @@ export function Details(): React.JSX.Element {
           </label>
 
           {awaitingConfirmation && isStar3 && (
-            <section className="generation-review-options" aria-label="Star-3 生成参数">
+            <section className="generation-review-options" aria-label={t('Star-3 生成参数')}>
               <label className="review-checkbox">
                 <input
                   type="checkbox"
@@ -176,10 +179,10 @@ export function Details(): React.JSX.Element {
                     }))
                   }}
                 />
-                <span>提示词智能优化</span>
+                <span>{t('提示词智能优化')}</span>
               </label>
               <label>
-                <span>采样步数</span>
+                <span>{t('采样步数')}</span>
                 <input
                   type="number"
                   min={1}
@@ -196,7 +199,7 @@ export function Details(): React.JSX.Element {
               </label>
               {job.selection.imageGeneration === 'reference' && (
                 <label>
-                  <span>去噪强度</span>
+                  <span>{t('去噪强度')}</span>
                   <input
                     type="number"
                     min={0}
@@ -219,15 +222,15 @@ export function Details(): React.JSX.Element {
           {awaitingConfirmation && (
             <section className="generation-request-review">
               <div>
-                <span>本次请求（只读）· 共 {job.selection.generationCount} 张{review ? `，${review.length} 次请求` : ''}</span>
-                <small>图片地址为上传前占位值；确认时会替换成真实上传地址。</small>
+                <span>{t('本次请求（只读）· 共 ')}{job.selection.generationCount} {t(' 张')}{review ? t('，{0} 次请求', review.length) : ''}</span>
+                <small>{t('图片地址为上传前占位值；确认时会替换成真实上传地址。')}</small>
               </div>
-              <pre>{review ? JSON.stringify(review, null, 2) : reviewError || '正在构建请求预览…'}</pre>
+              <pre>{review ? JSON.stringify(review, null, 2) : t(reviewError) || t('正在构建请求预览…')}</pre>
             </section>
           )}
 
           <div className="details-actions">
-            <p>{message || (!optionsValid ? '请输入有效的 Star-3 参数。' : job?.error?.message)}</p>
+            <p>{t(message) || (!optionsValid ? t('请输入有效的 Star-3 参数。') : t(job?.error?.message))}</p>
             <div>
               {awaitingConfirmation && (
                 <button
@@ -235,23 +238,23 @@ export function Details(): React.JSX.Element {
                   className="secondary-button"
                   disabled={submitting}
                   onClick={() => void cancelConfirmation()}
-                >取消生成</button>
+                >{t('取消生成')}</button>
               )}
               <button
                 type="submit"
                 disabled={running || submitting || !draft || (awaitingConfirmation && !review)}
               >
                 {submitting || running
-                  ? '生成中…'
+                  ? t('生成中…')
                   : awaitingConfirmation
-                    ? `确认并生成${job.selection.generationCount > 1 ? ` ${job.selection.generationCount} 张` : ''}`
-                    : `使用此提示词重新生成${job.selection.generationCount > 1 ? ` ${job.selection.generationCount} 张` : ''}`}
+                    ? t('确认并生成{0}', job.selection.generationCount > 1 ? t(' {0} 张', job.selection.generationCount) : '')
+                    : t('使用此提示词重新生成{0}', job.selection.generationCount > 1 ? t(' {0} 张', job.selection.generationCount) : '')}
               </button>
             </div>
           </div>
         </form>
       ) : (
-        <div className="details-waiting"><span className="preview-spinner" />正在分析截图与说明…</div>
+        <div className="details-waiting"><span className="preview-spinner" />{t('正在分析截图与说明…')}</div>
       )}
     </main>
   )

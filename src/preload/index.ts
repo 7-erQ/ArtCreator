@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { languageSchema } from '../shared/language'
 import {
   credentialTargetSchema,
   captureOverlaySessionSchema,
@@ -35,6 +36,13 @@ import {
 const api: AppApi = {
   platform: process.platform,
   settings: {
+    onLanguageChanged: (callback) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: unknown): void => {
+        callback(languageSchema.parse(value))
+      }
+      ipcRenderer.on(IPC_CHANNELS.settingsLanguageChanged, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.settingsLanguageChanged, listener)
+    },
     get: async () => publicSettingsSchema.parse(await ipcRenderer.invoke(IPC_CHANNELS.settingsGet)),
     update: async (update) => {
       const validated = settingsUpdateSchema.parse(update)

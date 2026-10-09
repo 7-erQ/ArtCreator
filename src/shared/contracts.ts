@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { languageSchema, type Language } from './language'
 import {
   DEFAULT_IMAGE_MODEL_SELECTION,
   comfyUiCheckpointSchema,
@@ -285,6 +286,7 @@ export function defaultGenerationOptions(
 }
 
 export const publicSettingsSchema = z.object({
+  language: languageSchema,
   hotkey: z.string().min(1),
   textBaseUrl: apiBaseUrlSchema,
   textModel: textModelSchema,
@@ -370,6 +372,7 @@ export const comfyUiWorkflowInspectInputSchema = comfyUiWorkflowListInputSchema.
 })
 
 export interface SettingsApi {
+  onLanguageChanged(callback: (language: Language) => void): () => void
   get(): Promise<PublicSettings>
   update(update: SettingsUpdate): Promise<PublicSettings>
   updateCaptureOverlayProtection(enabled: boolean): Promise<PublicSettings>
@@ -390,6 +393,7 @@ export interface AppApi {
 
 export const IPC_CHANNELS = {
   settingsGet: 'settings:get',
+  settingsLanguageChanged: 'settings:language-changed',
   settingsUpdate: 'settings:update',
   settingsUpdateCaptureOverlayProtection: 'settings:update-capture-overlay-protection',
   settingsClearCredential: 'settings:clear-credential',

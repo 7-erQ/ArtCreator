@@ -14,6 +14,7 @@ import {
   Tray
 } from 'electron'
 import OpenAI from 'openai'
+import { languageSchema, setLanguage, t, type Language } from '../shared/language'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import {
   credentialTargetSchema,
@@ -135,8 +136,10 @@ function createWindow(
       sandbox: true
     }
   })
+  updateWindowTitle(window, view)
 
   window.webContents.once('did-finish-load', () => {
+    updateWindowTitle(window, view)
     timing({
       flow: 'application',
       event: 'window_loaded',
@@ -174,38 +177,92 @@ function showSettings(): void {
   }
 
   settingsWindow = createWindow('settings', {
-    title: 'Art Creator Settings',
     width: 620,
     height: 840,
     minWidth: 520,
     minHeight: 620,
     backgroundColor: '#f3ecdc'
   })
+  refreshSettingsMenu()
+  settingsWindow.on('closed', () => {
+    settingsWindow = undefined
+  })
+}
+
+function refreshSettingsMenu(): void {
   const menu = Menu.buildFromTemplate([
     {
       id: 'edit-menu',
       role: 'editMenu',
+      label: t('编辑'),
       submenu: [
-        { id: 'edit-undo', role: 'undo' },
-        { id: 'edit-redo', role: 'redo' },
+        { id: 'edit-undo', role: 'undo', label: t('撤销') },
+        { id: 'edit-redo', role: 'redo', label: t('重做') },
         { type: 'separator' },
-        { id: 'edit-cut', role: 'cut' },
-        { id: 'edit-copy', role: 'copy' },
-        { id: 'edit-paste', role: 'paste' },
+        { id: 'edit-cut', role: 'cut', label: t('剪切') },
+        { id: 'edit-copy', role: 'copy', label: t('复制') },
+        { id: 'edit-paste', role: 'paste', label: t('粘贴') },
         { type: 'separator' },
-        { id: 'edit-select-all', role: 'selectAll' }
+        { id: 'edit-select-all', role: 'selectAll', label: t('全选') }
       ]
     },
     {
-      label: '工具',
-      submenu: [{ id: 'open-debug-panel', label: '调试面板', click: showDebugPanel }]
+      label: t('工具'),
+      submenu: [{ id: 'open-debug-panel', label: t('调试面板'), click: showDebugPanel }]
+    },
+    {
+      id: 'language-menu',
+      label: 'Language',
+      submenu: [
+        {
+          id: 'language-zh-CN', label: '简体中文', type: 'radio',
+          checked: settingsStore.getLanguage() === 'zh-CN',
+          click: () => void changeLanguage('zh-CN')
+        },
+        {
+          id: 'language-en', label: 'English', type: 'radio',
+          checked: settingsStore.getLanguage() === 'en',
+          click: () => void changeLanguage('en')
+        }
+      ]
     }
   ])
-  settingsWindow.setMenu(menu)
+  settingsWindow?.setMenu(menu)
   Menu.setApplicationMenu(menu)
-  settingsWindow.on('closed', () => {
-    settingsWindow = undefined
-  })
+}
+
+function updateWindowTitle(window: BrowserWindow, view: string): void {
+  const titles: Record<string, string> = {
+    settings: 'Art Creator 设置',
+    debug: 'Art Creator 调试',
+    properties: '图片属性',
+    details: '确认生成请求',
+    upscale: '放大 / 改尺寸'
+  }
+  const title = titles[view]
+  if (title) window.setTitle(t(title))
+}
+
+async function changeLanguage(rawLanguage: Language): Promise<void> {
+  const language = languageSchema.parse(rawLanguage)
+  try {
+    await settingsStore.updateLanguage(language)
+    setLanguage(language)
+    BrowserWindow.getAllWindows().forEach((window) => {
+      if (!window.isDestroyed()) {
+        window.webContents.send(IPC_CHANNELS.settingsLanguageChanged, language)
+        const url = window.webContents.getURL()
+        const view = url ? new URL(url).searchParams.get('view') : undefined
+        if (view) updateWindowTitle(window, view)
+      }
+    })
+    refreshSettingsMenu()
+    refreshTray()
+  } catch (error) {
+    refreshSettingsMenu()
+    applicationLogger.unexpected('language_save_failed', error)
+    dialog.showErrorBox(t('语言切换失败'), t('无法保存语言设置，请检查本地数据目录是否可写。'))
+  }
 }
 
 function showDebugPanel(): void {
@@ -216,7 +273,6 @@ function showDebugPanel(): void {
   }
 
   debugWindow = createWindow('debug', {
-    title: 'Art Creator Debug',
     width: 620,
     height: 520,
     minWidth: 520,
@@ -235,7 +291,7 @@ function onCaptureShortcut(): void {
 
 function registerConfiguredShortcut(accelerator: string): boolean {
   const registered = shortcutManager.register(accelerator, onCaptureShortcut)
-  hotkeyError = registered ? undefined : `快捷键 ${accelerator} 已被其他应用占用。`
+  hotkeyError = registered ? undefined : t('快捷键 {0} 已被其他应用占用。', accelerator)
   return registered
 }
 
@@ -244,15 +300,15 @@ function refreshTray(): void {
   const previews = previewController?.getTrayMenuTemplate() ?? []
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: '开始截图生成', click: onCaptureShortcut },
-      { label: '设置', click: showSettings },
+      { label: t('开始截图生成'), click: onCaptureShortcut },
+      { label: t('设置'), click: showSettings },
       {
-        label: '置顶预览',
-        submenu: previews.length > 0 ? previews : [{ label: '暂无预览', enabled: false }]
+        label: t('置顶预览'),
+        submenu: previews.length > 0 ? previews : [{ label: t('暂无预览'), enabled: false }]
       },
-      { id: 'open-log-directory', label: '打开日志目录', click: () => void openLogDirectory() },
+      { id: 'open-log-directory', label: t('打开日志目录'), click: () => void openLogDirectory() },
       { type: 'separator' },
-      { label: '退出', click: () => app.quit() }
+      { label: t('退出'), click: () => app.quit() }
     ])
   )
 }
@@ -312,7 +368,7 @@ function registerIpc(): void {
     async (_event, rawInput: unknown): Promise<ConnectionTestResult> => {
       const validation = connectionTestInputSchema.safeParse(rawInput)
       if (!validation.success) {
-        return { ok: false, message: '测试配置无效，请检查填写内容。' }
+        return { ok: false, message: t('测试配置无效，请检查填写内容。') }
       }
       try {
         return testApiConnection(
@@ -336,7 +392,7 @@ function registerIpc(): void {
           !app.isPackaged
         )
       } catch {
-        return { ok: false, message: '无法读取已保存的 API Key，请重新输入后测试。' }
+        return { ok: false, message: t('无法读取已保存的 API Key，请重新输入后测试。') }
       }
     }
   )
@@ -365,9 +421,9 @@ function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.debugChooseImage, async (event): Promise<string | undefined> => {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? settingsWindow
     const options: Electron.OpenDialogOptions = {
-      title: '选择调试图片',
+      title: t('选择调试图片'),
       properties: ['openFile'],
-      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }]
+      filters: [{ name: t('图片'), extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }]
     }
     const choice = owner && !owner.isDestroyed()
       ? await dialog.showOpenDialog(owner, options)
@@ -383,9 +439,9 @@ function registerIpc(): void {
     const effectChoice = rawEffectChoice === undefined
       ? undefined
       : generationEffectChoiceSchema.parse(rawEffectChoice)
-    if (!generationManager || !previewController) throw new Error('调试预览暂不可用。')
+    if (!generationManager || !previewController) throw new Error(t('调试预览暂不可用。'))
     const image = nativeImage.createFromPath(imagePath)
-    if (image.isEmpty()) throw new Error('无法读取指定图片，请确认文件存在且格式受支持。')
+    if (image.isEmpty()) throw new Error(t('无法读取指定图片，请确认文件存在且格式受支持。'))
 
     const size = image.getSize()
     const display = screen.getPrimaryDisplay()
@@ -402,7 +458,7 @@ function registerIpc(): void {
       y: Math.round(display.workArea.y + (display.workArea.height - height) / 2),
       width,
       height
-    }, basename(imagePath, extname(imagePath)) || '调试图片', effectChoice)
+    }, basename(imagePath, extname(imagePath)) || t('调试图片'), effectChoice)
   })
   ipcMain.handle(IPC_CHANNELS.jobsList, (): GenerationJobSnapshot[] => generationManager?.list() ?? [])
   ipcMain.handle(IPC_CHANNELS.jobsGet, (_event, rawId: unknown) =>
@@ -613,6 +669,7 @@ if (!hasLock) {
     app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
 
     await settingsStore.load()
+    setLanguage(settingsStore.getLanguage())
     generationManager = new GenerationManager({
       createPromptPolisher: () => {
         const connection = settingsStore.getTextApiConnection()

@@ -1,3 +1,4 @@
+import { t } from '../shared/language'
 import { randomUUID } from 'node:crypto'
 import {
   BrowserWindow,
@@ -172,12 +173,12 @@ async function ensureScreenRecordingPermission(): Promise<boolean> {
 
   const result = await dialog.showMessageBox({
     type: 'warning',
-    title: '需要屏幕录制权限',
+    title: t('需要屏幕录制权限'),
     message: status === 'not-determined'
-      ? 'Art Creator 尚未获得屏幕录制权限。'
-      : 'Art Creator 无法读取屏幕画面。',
-    detail: '请在“隐私与安全性 > 屏幕与系统音频录制”中启用 Art Creator，然后重新启动应用。',
-    buttons: ['打开“隐私与安全性”', '取消'],
+      ? t('Art Creator 尚未获得屏幕录制权限。')
+      : t('Art Creator 无法读取屏幕画面。'),
+    detail: t('请在“隐私与安全性 > 屏幕与系统音频录制”中启用 Art Creator，然后重新启动应用。'),
+    buttons: [t('打开“隐私与安全性”'), t('取消')],
     defaultId: 0,
     cancelId: 1
   })
@@ -273,7 +274,7 @@ export class CaptureController {
       : undefined
     if (followUp && (followUp.currentImagePng.length === 0 ||
       (followUp.action === 'reconfigure' && followUp.screenshotPng.length === 0))) {
-      throw new Error('后续编辑所需的截图或当前图片不可用。')
+      throw new Error(t('后续编辑所需的截图或当前图片不可用。'))
     }
     const workflowId = randomUUID()
     const startedAtMs = timingNow()
@@ -289,7 +290,7 @@ export class CaptureController {
       }
       this.logTiming(workflowId, startedAtMs, 'capture_permission_ready')
       const displays = screen.getAllDisplays()
-      if (displays.length === 0) throw new Error('未找到可用显示器。')
+      if (displays.length === 0) throw new Error(t('未找到可用显示器。'))
       this.initialized = true
       await this.synchronizeOverlays(displays)
       this.logTiming(workflowId, startedAtMs, 'capture_overlays_ready', { displays: displays.length })
@@ -330,9 +331,9 @@ export class CaptureController {
       if (session.followUp?.action === 'reconfigure') {
         const displayId = session.followUp.selection.displayId
         const snapshot = session.snapshots.get(displayId)
-        if (!snapshot) throw new Error('原截屏所在的显示器当前不可用。')
+        if (!snapshot) throw new Error(t('原截屏所在的显示器当前不可用。'))
         const source = nativeImage.createFromBuffer(session.followUp.screenshotPng)
-        if (source.isEmpty()) throw new Error('无法读取悬浮窗的原始截屏。')
+        if (source.isEmpty()) throw new Error(t('无法读取悬浮窗的原始截屏。'))
         const expectedSize = {
           width: Math.max(1, Math.round(snapshot.display.size.width * snapshot.display.scaleFactor)),
           height: Math.max(1, Math.round(snapshot.display.size.height * snapshot.display.scaleFactor))
@@ -363,8 +364,8 @@ export class CaptureController {
       this.logTiming(workflowId, startedAtMs, 'capture_failed')
       await dialog.showMessageBox({
         type: 'error',
-        title: '无法捕获屏幕',
-        message: error instanceof Error ? error.message : '屏幕捕获失败。'
+        title: t('无法捕获屏幕'),
+        message: error instanceof Error ? error.message : t('屏幕捕获失败。')
       })
     }
   }
@@ -468,10 +469,10 @@ export class CaptureController {
       const submissionMode = captureSubmissionModeSchema.parse(rawSubmissionMode)
       if ((selection.referenceRectsDip?.length ?? 0) > 0 &&
         !supportsImageGeneration(selection.imageModel, 'reference')) {
-        throw new Error('当前模型不支持参考生成，请更换模型或撤销蓝色参考框后提交。')
+        throw new Error(t('当前模型不支持参考生成，请更换模型或撤销蓝色参考框后提交。'))
       }
       if (submissionMode === 'fake' && !this.options.allowFakeGeneration) {
-        throw new Error('假生成仅在开发环境可用。')
+        throw new Error(t('假生成仅在开发环境可用。'))
       }
       if (selection.displayId !== displayId) throw new Error('Capture display mismatch.')
       if (session.activeDisplayId && session.activeDisplayId !== displayId) {
@@ -479,7 +480,7 @@ export class CaptureController {
       }
       if (selection.imageModel.provider === 'comfyui') {
         const capabilities = await this.getComfyUiCapabilities(session)
-        if (!capabilities.available) throw new Error('ComfyUI 当前不可用，请选择其它图片供应商。')
+        if (!capabilities.available) throw new Error(t('ComfyUI 当前不可用，请选择其它图片供应商。'))
         const imageModel = selection.imageModel
         if ('workflowPath' in imageModel) {
           const configured = this.options.getComfyUiWorkflowBindings().find((binding) =>
@@ -488,14 +489,14 @@ export class CaptureController {
             JSON.stringify(configured) !== JSON.stringify(selection.comfyUiWorkflowBinding) ||
             !capabilities.workflows.some((workflow) =>
               workflow.path === imageModel.workflowPath)) {
-            throw new Error('ComfyUI 工作流或节点绑定已变化，请重新选择后提交。')
+            throw new Error(t('ComfyUI 工作流或节点绑定已变化，请重新选择后提交。'))
           }
         } else if ('model' in imageModel) {
           const options = selection.comfyUiGenerationOptions!
           if (!capabilities.checkpoints.includes(imageModel.model) ||
             !capabilities.samplers.includes(options.samplerName) ||
             !capabilities.schedulers.includes(options.scheduler)) {
-            throw new Error('ComfyUI 模型或采样参数已变化，请重新选择后提交。')
+            throw new Error(t('ComfyUI 模型或采样参数已变化，请重新选择后提交。'))
           }
         }
       }
@@ -522,7 +523,7 @@ export class CaptureController {
       const selectedReferenceRects = selection.referenceRectsDip ?? []
       if (session.followUp?.action === 'continue_edit' &&
         selectedReferenceRects.length + 1 > MAX_REFERENCE_IMAGE_COUNT) {
-        throw new Error(`继续编辑最多支持 ${MAX_REFERENCE_IMAGE_COUNT} 张参考图。`)
+        throw new Error(t('继续编辑最多支持 {0} 张参考图。', MAX_REFERENCE_IMAGE_COUNT))
       }
 
       const image = snapshot.image
@@ -675,7 +676,7 @@ export class CaptureController {
     await waitWithTimeout(
       Promise.all(activeEntries.map((entry) => entry.ready.promise)),
       OVERLAY_READY_TIMEOUT_MS,
-      '截屏浮层初始化超时。'
+      t('截屏浮层初始化超时。')
     )
   }
 
@@ -727,7 +728,7 @@ export class CaptureController {
       const displayId = String(display.id)
       const entry = this.overlays.get(displayId)
       const snapshot = session.snapshots.get(displayId)
-      if (!entry || !snapshot) throw new Error(`显示器 ${display.id} 的截屏浮层不可用。`)
+      if (!entry || !snapshot) throw new Error(t('显示器 {0} 的截屏浮层不可用。', display.id))
 
       setCaptureOverlayWindowLevel(entry.window, false)
       entry.window.setBounds(display.bounds, false)
@@ -761,7 +762,7 @@ export class CaptureController {
     await waitWithTimeout(
       Promise.all(presentations.map(({ ready }) => ready)),
       SESSION_READY_TIMEOUT_MS,
-      '截屏画面加载超时。'
+      t('截屏画面加载超时。')
     )
     if (this.session !== session) return
 

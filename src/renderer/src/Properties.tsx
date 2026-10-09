@@ -1,3 +1,5 @@
+import { useLanguage } from './useLanguage'
+import { t } from '../../shared/language'
 import { useEffect, useState } from 'react'
 import type { ImagePropertiesViewState, ResultVersion } from '../../shared/contracts'
 
@@ -19,10 +21,11 @@ function formatFileSize(bytes: number): string {
 }
 
 function versionDimensions(version: ResultVersion): string {
-  return version.width && version.height ? `${version.width} × ${version.height} px` : '未知'
+  return version.width && version.height ? `${version.width} × ${version.height} px` : t('未知')
 }
 
 export function Properties(): React.JSX.Element {
+  const language = useLanguage()
   const initialId = new URLSearchParams(window.location.search).get('jobId') ?? ''
   const [jobId, setJobId] = useState(initialId)
   const [state, setState] = useState<ImagePropertiesViewState>()
@@ -106,76 +109,76 @@ export function Properties(): React.JSX.Element {
       <header className="properties-header">
         <div>
           <p className="eyebrow">IMAGE PROPERTIES / VERSION HISTORY</p>
-          <h1>{state?.assetName ?? '图片属性'}</h1>
+          <h1>{state?.assetName ?? t('图片属性')}</h1>
         </div>
-        <button className="properties-close" onClick={() => window.close()} aria-label="关闭属性窗">×</button>
+        <button className="properties-close" onClick={() => window.close()} aria-label={t('关闭属性窗')}>×</button>
       </header>
 
       {selectedVersion ? (
         <>
-          <section className="properties-preview" aria-label="历史版本预览">
+          <section className="properties-preview" aria-label={t('历史版本预览')}>
             <button
               className="version-arrow version-arrow-left"
               onClick={() => selectOffset(-1)}
               disabled={selectedIndex <= 0}
-              aria-label="上一个历史版本"
+              aria-label={t('上一个历史版本')}
             >‹</button>
             <div className="properties-image-stage">
-              <img src={selectedVersion.imageDataUrl} alt={`生成历史版本 ${selectedIndex + 1}`} />
+              <img src={selectedVersion.imageDataUrl} alt={t('生成历史版本 {0}', selectedIndex + 1)} />
             </div>
             <button
               className="version-arrow version-arrow-right"
               onClick={() => selectOffset(1)}
               disabled={!state || selectedIndex >= state.versions.length - 1}
-              aria-label="下一个历史版本"
+              aria-label={t('下一个历史版本')}
             >›</button>
             <div className="version-caption">
-              <span>版本 {selectedIndex + 1} / {state?.versions.length ?? 0}</span>
-              <strong>{ACTION_LABEL[selectedVersion.action]}</strong>
-              {isCurrent && <em>当前使用</em>}
+              <span>{t('版本 ')}{selectedIndex + 1} / {state?.versions.length ?? 0}</span>
+              <strong>{t(ACTION_LABEL[selectedVersion.action])}</strong>
+              {isCurrent && <em>{t('当前使用')}</em>}
             </div>
           </section>
 
-          <section className="properties-metadata" aria-label="图片属性信息">
-            <div><span>尺寸</span><strong>{versionDimensions(selectedVersion)}</strong></div>
-            <div><span>文件大小</span><strong>{formatFileSize(selectedVersion.sizeBytes)}</strong></div>
-            <div><span>格式</span><strong>PNG</strong></div>
-            <div><span>背景</span><strong>{selectedVersion.background === 'transparent' ? '透明' : '不透明'}</strong></div>
+          <section className="properties-metadata" aria-label={t('图片属性信息')}>
+            <div><span>{t('尺寸')}</span><strong>{versionDimensions(selectedVersion)}</strong></div>
+            <div><span>{t('文件大小')}</span><strong>{formatFileSize(selectedVersion.sizeBytes)}</strong></div>
+            <div><span>{t('格式')}</span><strong>PNG</strong></div>
+            <div><span>{t('背景')}</span><strong>{selectedVersion.background === 'transparent' ? t('透明') : t('不透明')}</strong></div>
             <div className="metadata-wide">
-              <span>生成时间</span>
-              <strong>{new Date(selectedVersion.createdAt).toLocaleString('zh-CN', { hour12: false })}</strong>
+              <span>{t('生成时间')}</span>
+              <strong>{new Date(selectedVersion.createdAt).toLocaleString(language, { hour12: false })}</strong>
             </div>
           </section>
 
           {selectedVersion.prompt && (
-            <section className="properties-prompt" aria-label="图片提示词">
-              <span>{selectedVersion.action === 'capture' ? '初始素材说明' : '本次生成提示词'}</span>
+            <section className="properties-prompt" aria-label={t('图片提示词')}>
+              <span>{selectedVersion.action === 'capture' ? t('初始素材说明') : t('本次生成提示词')}</span>
               <textarea
                 value={selectedVersion.prompt}
                 readOnly
-                aria-label="提示词内容"
+                aria-label={t('提示词内容')}
               />
             </section>
           )}
 
           <footer className="properties-actions">
-            <p aria-live="polite">{notice || (state?.busy ? '生成进行中，完成后可应用其他版本。' : '选择历史版本后可应用或保存。')}</p>
+            <p aria-live="polite">{t(notice) || (state?.busy ? t('生成进行中，完成后可应用其他版本。') : t('选择历史版本后可应用或保存。'))}</p>
             <div>
               <button
                 className="properties-apply"
                 disabled={state?.busy || isCurrent || applying || saving}
                 onClick={() => void applySelected()}
-              >{applying ? '应用中…' : isCurrent ? '已应用' : '应用'}</button>
+              >{applying ? t('应用中…') : isCurrent ? t('已应用') : t('应用')}</button>
               <button
                 className="properties-save"
                 disabled={applying || saving}
                 onClick={() => void saveSelected()}
-              >{saving ? '保存中…' : '保存'}</button>
+              >{saving ? t('保存中…') : t('保存')}</button>
             </div>
           </footer>
         </>
       ) : (
-        <div className="properties-empty"><span className="preview-spinner" />正在读取图片属性…</div>
+        <div className="properties-empty"><span className="preview-spinner" />{t('正在读取图片属性…')}</div>
       )}
     </main>
   )
